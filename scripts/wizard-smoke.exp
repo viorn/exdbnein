@@ -1,0 +1,36 @@
+#!/usr/bin/expect -f
+# Дымовой прогон визарда в псевдо-TTY: проходит все шаги и сохраняет конфиг.
+set timeout 30
+set env(TERM) xterm-256color
+
+# Отвечает на промпт: ждёт текст, даёт интерфейсу отрисоваться и отправляет ответ.
+proc answer {pattern reply} {
+    expect -re $pattern
+    after 250
+    send -- "$reply"
+}
+
+spawn bun run src/index.ts -c /tmp/exdbnein-config.json
+
+answer "Устройство для установки" "/dev/sda\r"
+answer "Файловая система" "\r"
+answer "subvolumes" "\r"
+answer "swap-раздел" "\r"
+answer "Размер swap" "\r"
+
+answer "Локаль" "ru_RU.UTF-8\r"
+answer "Раскладка" "us,ru\r"
+answer "Часовой пояс" "Europe/Moscow\r"
+
+answer "hostname" "testbox\r"
+answer "Менеджер сети" "\r"
+
+answer "Пароль root" "rootpass\r"
+answer "Имя пользователя" "alice\r"
+answer "Пароль для alice" "alicepass\r"
+answer "группу sudo" "\r"
+answer "ещё пользователя" "\r"
+
+answer "Начать установку" "\r"
+
+expect eof
