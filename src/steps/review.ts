@@ -1,12 +1,21 @@
 import { note } from "@clack/prompts";
+import type { DiskConfig, InstallConfig } from "../config/types.ts";
 import { validateConfig } from "../config/validate.ts";
 import { checkNetwork } from "../system/environment.ts";
 import { backOption, isBack, select } from "../ui/prompts.ts";
 import type { Step, StepResult } from "../ui/wizard.ts";
 
-function formatSummary(config: import("../config/types.ts").InstallConfig): string {
+function formatDisk(disk: DiskConfig): string {
+  if (disk.layout === "keep") {
+    const esp = disk.espPartition ? `, ESP ${disk.espPartition}` : "";
+    return `${disk.device} → root ${disk.rootPartition ?? "?"}${esp}`;
+  }
+  return `${disk.device} (${disk.filesystem}, ${disk.layout})`;
+}
+
+function formatSummary(config: InstallConfig): string {
   const lines = [
-    `Диск:        ${config.disk.device} (${config.disk.filesystem}, layout: ${config.disk.layout})`,
+    `Диск:        ${formatDisk(config.disk)}`,
     `Swap:        ${config.disk.swap ? `${config.disk.swapSizeGiB} GiB` : "нет"}`,
     `Hostname:    ${config.network.hostname}`,
     `Сеть:        ${config.network.manager}`,

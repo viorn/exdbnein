@@ -14,8 +14,18 @@ export interface DiskConfig {
   swap: boolean;
   /** Размер swap в GiB (если swap включён). */
   swapSizeGiB: number;
+  /** Размер ESP в GiB (схемы auto/manual, UEFI). */
+  espSizeGiB: number;
   /** Создавать subvolumes btrfs (@, @home, @snapshots). */
   btrfsSubvolumes: boolean;
+  /** keep: существующий раздел для /. */
+  rootPartition?: string;
+  /** keep: ФС раздела root — для subvol=@ при btrfs. */
+  rootPartitionFstype?: string;
+  /** keep: существующий раздел ESP (UEFI). */
+  espPartition?: string;
+  /** keep: существующий раздел подкачки. */
+  swapPartition?: string;
 }
 
 export interface UserConfig {
@@ -79,6 +89,7 @@ export function defaultConfig(): InstallConfig {
       filesystem: "btrfs",
       swap: true,
       swapSizeGiB: 4,
+      espSizeGiB: 1,
       btrfsSubvolumes: true,
     },
     locale: {

@@ -95,7 +95,7 @@ exdbnein/
 | 1 | Ядро TUI и модель конфигурации | ✅ | [phase1.md](phase1.md) |
 | 2 | Профили и наборы пакетов | ✅ | [phase2.md](phase2.md) |
 | 3 | Определение окружения | ✅ | [phase3.md](phase3.md) |
-| 4 | Разметка диска | ⬜ | [phase4.md](phase4.md) |
+| 4 | Разметка диска | ✅ | [phase4.md](phase4.md) |
 | 5 | Установка базовой системы | ⬜ | [phase5.md](phase5.md) |
 | 6 | Настройка системы | ⬜ | [phase6.md](phase6.md) |
 | 7 | Пост-установка и завершение | ⬜ | [phase7.md](phase7.md) |
@@ -123,9 +123,14 @@ UEFI/BIOS, список дисков через `lsblk -J` (модуль [`src/s
 Подробности — [phase3.md](phase3.md).
 
 ### Этап 4 — Разметка диска
-Авто/ручная/«оставить разделы»; UEFI → GPT+ESP+`/`(+swap), BIOS → MBR;
-btrfs subvolumes; parted/sgdisk + mkfs.*; монтирование в `/mnt`; dry-run экран;
-защита от повторного wipe при повторном входе.
+Реализован: начало фазы B — install-раннер [`src/install/`](../src/install/index.ts) со стадией
+подготовки диска ([`prepareDiskStage`](../src/install/disk.ts:33)). Схемы `auto` (wipe),
+`manual` (свои размеры ESP/swap), `keep` (монтирование существующих разделов без стирания);
+UEFI → GPT + ESP + `/` (+swap), BIOS → MBR + `/` (+swap); btrfs subvolumes
+`@`, `@home`, `@snapshots` с `compress=zstd,noatime`; раскладки и команды генерируются в
+[`src/system/disks.ts`](../src/system/disks.ts) (`parted`, `mkfs.*`, `btrfs`, `mount`), выводятся
+на экран dry-run и исполняются напрямую без shell; защита от повторного wipe —
+`isDiskPrepared` распознаёт размеченный диск по монтированию `/mnt`. Подробности — [phase4.md](phase4.md).
 
 ### Этап 5 — Базовая система
 `debootstrap` (stable) с зеркалом, bind-mounts (включая `/sys/firmware/efi/efivars` для UEFI),

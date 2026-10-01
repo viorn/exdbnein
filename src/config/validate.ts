@@ -28,6 +28,28 @@ export function validateConfig(config: InstallConfig): ValidationIssue[] {
     add("disk.swapSizeGiB", "Размер swap должен быть больше нуля");
   }
 
+  if (config.disk.espSizeGiB <= 0) {
+    add("disk.espSizeGiB", "Размер ESP должен быть больше нуля");
+  }
+
+  if (config.disk.layout === "keep") {
+    if (!config.disk.rootPartition) {
+      add("disk.rootPartition", "Для схемы keep укажите раздел для /");
+    } else if (!config.disk.rootPartition.startsWith("/dev/")) {
+      add("disk.rootPartition", "Путь к разделу должен начинаться с /dev/");
+    }
+    if (config.disk.espPartition && !config.disk.espPartition.startsWith("/dev/")) {
+      add("disk.espPartition", "Путь к разделу должен начинаться с /dev/");
+    }
+    if (
+      config.disk.swap &&
+      config.disk.swapPartition &&
+      !config.disk.swapPartition.startsWith("/dev/")
+    ) {
+      add("disk.swapPartition", "Путь к разделу должен начинаться с /dev/");
+    }
+  }
+
   if (!HOSTNAME_RE.test(config.network.hostname)) {
     add("network.hostname", "Некорректный hostname");
   }

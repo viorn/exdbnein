@@ -4,6 +4,7 @@ import { cancel, log } from "@clack/prompts";
 import { helpText, parseArgs } from "./cli.ts";
 import { defaultConfig, loadConfig, saveConfig } from "./config/index.ts";
 import type { InstallConfig } from "./config/types.ts";
+import { runInstall } from "./install/index.ts";
 import { buildSteps } from "./steps/index.ts";
 import { isLiveEnvironment, isRoot, LIVE_MARKER } from "./system/environment.ts";
 import { CancelledError, confirm, runWizard } from "./ui/index.ts";
@@ -89,6 +90,9 @@ async function main(): Promise<void> {
     await saveConfig(config, options.config);
     log.success(`Конфигурация сохранена: ${options.config}`);
   }
+
+  // Фаза B: применение конфигурации (этап 4 — подготовка диска и далее).
+  await runInstall(config, { interactive: !config.unattended });
 }
 
 try {
