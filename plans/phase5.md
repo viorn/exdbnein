@@ -1,6 +1,6 @@
 # Этап 5 — Установка базовой системы
 
-Статус: ⬜ не начат.
+Статус: ✅ завершён.
 Источник анализа: [`plans/plan-analysis.md`](plan-analysis.md), раздел «Этап 5».
 
 ## Цель
@@ -10,34 +10,52 @@
 
 ## Задачи
 
-- [ ] `debootstrap` (stable) в `/mnt` с выбором зеркала
-- [ ] Монтирование `/proc`, `/sys`, `/dev`, `/dev/pts`, `/run` в chroot
-- [ ] Для UEFI — bind-mount `/sys/firmware/efi/efivars` (P5.3)
-- [ ] `sources.list` (main contrib non-free non-free-firmware), `apt update`
-- [ ] Установка ядра `linux-image-amd64` и firmware
-- [ ] Генерация `fstab` по UUID (P5.2)
-- [ ] Долгие операции: прогресс, таймауты, kill-группа при отмене (P5.4)
+- [x] `debootstrap` (stable) в `/mnt` с зеркалом из конфига
+- [x] Монтирование `/proc`, `/sys`, `/dev`, `/dev/pts`, `/run` в chroot
+- [x] Для UEFI — bind-mount `/sys/firmware/efi/efivars` (P5.3)
+- [x] `sources.list` (main contrib non-free non-free-firmware), `apt update`
+- [x] Установка ядра `linux-image-amd64` и firmware
+- [x] Генерация `fstab` по UUID (P5.2)
+- [x] Долгие операции: прогресс, таймауты, kill-группа при отмене (P5.4)
 
 ## Принятые решения
 
 - Зеркало по умолчанию `http://deb.debian.org/debian`, компоненты
   `main contrib non-free non-free-firmware` (Debian 12+).
-- `fstab` — по UUID (устройства меняют имена между перезагрузками).
-- Долгие системные операции выносятся в модуль `src/system/run.ts`: спиннер/прогресс в TUI,
-  лимит времени, уничтожение дочерних процессов при Ctrl+C.
+- `fstab` — по UUID (устройства меняют имена между перезагрузками). Генератор свой
+  (`src/system/fstab.ts`): читает фактические монтирования `findmnt -R -J` по целевому корню,
+  swap — из `/proc/swaps`, UUID — из `blkid -o export`. `genfstab` не используется — он входит
+  в arch-install-scripts, которого нет в Debian.
+- Долгие системные операции вынесены в модуль [`src/system/run.ts`](../src/system/run.ts):
+  спиннер в TUI, лимит времени, уничтожение дочерних процессов при Ctrl+C.
+  Команда запускается через `setsid` и становится лидером новой группы процессов;
+  завершение — сигналом на отрицательный pid (kill-группа целиком).
+- План этапа — идемпотентный набор действий ([`src/system/base.ts`](../src/system/base.ts)):
+  каждый под-шаг пропускается, если уже выполнен (debian_version, chroot-монтирования,
+  apt-списки, dpkg-статус ядра, наличие fstab). Повторный вход поверх готового `/mnt`
+  ничего не ломает.
+- Preflight (P5.1): без `debootstrap` или `debian-archive-keyring` в LiveCD — понятный отказ
+  до начала установки, а не падение посреди операции.
+- `sources.list`: stable + stable-updates + security; компоненты — пробельный разделитель
+  (для debootstrap `--components` — запятые).
 
 ## Риски
 
-- P5.1 🟡 В LiveCD должны быть `debootstrap` и `debian-archive-keyring`; в офлайне — понятный отказ.
-- P5.2 🔴 `fstab` по UUID, не по `/dev/sdX` — генератор или `genfstab -U`.
-- P5.3 🟡 Для UEFI `grub-install` в chroot нужен `/sys/firmware/efi/efivars` — включить в список
-  обязательных монтирований.
-- P5.4 🟡 `debootstrap`/`apt` идут минуты; Ctrl+C не должен оставлять осиротевшие процессы —
-  kill-группа в `system/run.ts`.
+- P5.1 🟡 `debootstrap` и `debian-archive-keyring` в LiveCD — проверяются в preflight стадии
+  ([`install/base.ts`](../src/install/base.ts)); офлайн-отказ понятный.
+- P5.2 🔴 `fstab` по UUID — собственный генератор по `findmnt`/`blkid`; btrfs-subvolumes
+  сохраняют `subvol=`, vfat ESP получает `umask=0077`; покрыто тестами.
+- P5.3 🟡 Для UEFI efivars в списке обязательных монтирований chroot
+  ([`chrootMounts`](../src/system/chroot.ts)) — без него на этапе 6 не встанет GRUB.
+- P5.4 🟡 Ctrl+C во время `debootstrap`/`apt` — kill-группа в `run.ts`; повторный Ctrl+C
+  или «зависшая» очистка → жёсткий SIGKILL; тест проверяет, что процессов не остаётся.
 
 ## Критерии готовности
 
-- После этапа 5 в `/mnt` есть загружаемое ядро и корректный `fstab` (UUID).
-- Отмена во время debootstrap не оставляет процессов установщика в системе.
-- Повторный запуск поверх готового `/mnt` не ломает установленное (идемпотентность).
-- `bun run check` зелёный.
+- [x] После этапа 5 в `/mnt` есть загружаемое ядро и корректный `fstab` (UUID) —
+  генерируется на стадии [`installBaseStage`](../src/install/base.ts); QEMU-прогон — этап 9.
+- [x] Отмена во время debootstrap не оставляет процессов установщика в системе —
+  kill-группа в [`src/system/run.ts`](../src/system/run.ts) + тест `tests/run.test.ts`.
+- [x] Повторный запуск поверх готового `/mnt` не ломает установленное (идемпотентность
+  каждого под-шага плана).
+- [x] `bun run check` зелёный (81 тест, 26 новых для этапа 5).

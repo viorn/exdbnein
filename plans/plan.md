@@ -96,7 +96,7 @@ exdbnein/
 | 2 | Профили и наборы пакетов | ✅ | [phase2.md](phase2.md) |
 | 3 | Определение окружения | ✅ | [phase3.md](phase3.md) |
 | 4 | Разметка диска | ✅ | [phase4.md](phase4.md) |
-| 5 | Установка базовой системы | ⬜ | [phase5.md](phase5.md) |
+| 5 | Установка базовой системы | ✅ | [phase5.md](phase5.md) |
 | 6 | Настройка системы | ⬜ | [phase6.md](phase6.md) |
 | 7 | Пост-установка и завершение | ⬜ | [phase7.md](phase7.md) |
 | 8 | Сборка LiveCD | ⬜ | [phase8.md](phase8.md) |
@@ -133,8 +133,14 @@ UEFI → GPT + ESP + `/` (+swap), BIOS → MBR + `/` (+swap); btrfs subvolumes
 `isDiskPrepared` распознаёт размеченный диск по монтированию `/mnt`. Подробности — [phase4.md](phase4.md).
 
 ### Этап 5 — Базовая система
-`debootstrap` (stable) с зеркалом, bind-mounts (включая `/sys/firmware/efi/efivars` для UEFI),
-`sources.list`, ядро + firmware, `fstab` по UUID.
+Реализован: стадия [`installBaseStage`](../src/install/base.ts) — `debootstrap` (minbase, stable)
+с зеркалом из конфига, chroot-монтирования `/proc /sys /dev /dev/pts /run` (+ efivars для UEFI),
+`/etc/resolv.conf`, `sources.list` (main contrib non-free non-free-firmware), `apt-get update`,
+ядро `linux-image-amd64` + `firmware-linux`. Генератор `fstab` по UUID —
+[`src/system/fstab.ts`](../src/system/fstab.ts) (`findmnt` + `/proc/swaps` + `blkid`, subvolumes
+и umask для ESP). Долгие операции — [`src/system/run.ts`](../src/system/run.ts): спиннер,
+таймауты, kill-группа при Ctrl+C (P5.4). Все под-шаги идемпотентны; preflight проверяет
+`debootstrap` и `debian-archive-keyring` (P5.1). Подробности — [phase5.md](phase5.md).
 
 ### Этап 6 — Настройка системы
 hostname, locale/keymap/timezone (debconf-пресеты), пользователи и sudo, сеть, GRUB

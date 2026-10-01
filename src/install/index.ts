@@ -1,5 +1,6 @@
 import { log } from "@clack/prompts";
 import type { InstallConfig } from "../config/types.ts";
+import { installBaseStage } from "./base.ts";
 import { prepareDiskStage } from "./disk.ts";
 
 export interface InstallContext {
@@ -15,7 +16,7 @@ export interface InstallStage {
 }
 
 /** Стадии фазы B в порядке применения; следующие этапы добавляют новые. */
-const STAGES: InstallStage[] = [prepareDiskStage];
+const STAGES: InstallStage[] = [prepareDiskStage, installBaseStage];
 
 /**
  * Фаза B: применяет готовый конфиг к системе. Линейный раннер без возвратов —
