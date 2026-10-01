@@ -1,0 +1,10 @@
+name: child
+description: Ребёнок base
+extends: base
+packages:
+  - git
+  - curl
+files:
+  - path: /etc/b.conf
+    content: "b"
+    mode: "0644"

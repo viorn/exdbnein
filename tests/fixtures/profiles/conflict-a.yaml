@@ -1,0 +1,6 @@
+name: conflict-a
+description: Конфликт по /etc/x.conf
+files:
+  - path: /etc/x.conf
+    content: "aaa"
+    mode: "0644"

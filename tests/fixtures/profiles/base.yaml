@@ -1,0 +1,10 @@
+name: base
+description: Базовая фикстура
+packages:
+  - curl
+services:
+  - ssh
+files:
+  - path: /etc/a.conf
+    content: "a"
+    mode: "0644"

@@ -1,0 +1,3 @@
+name: cycle-b
+description: Цикл
+extends: cycle-a

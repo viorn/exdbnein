@@ -1,0 +1,15 @@
+name: desktop
+description: Рабочий стол XFCE на базе base
+extends: base
+packages:
+  - xorg
+  - xfce4
+  - xfce4-goodies
+  - lightdm
+  - network-manager
+services:
+  - lightdm
+  - NetworkManager
+commands:
+  - cmd: systemctl set-default graphical.target
+    description: Загрузка в графический режим

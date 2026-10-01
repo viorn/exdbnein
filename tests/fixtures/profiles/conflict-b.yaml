@@ -1,0 +1,6 @@
+name: conflict-b
+description: Конфликт по /etc/x.conf
+files:
+  - path: /etc/x.conf
+    content: "bbb"
+    mode: "0644"

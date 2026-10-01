@@ -1,0 +1,14 @@
+name: base
+description: Базовая система: SSH, sudo, базовые утилиты
+packages:
+  - sudo
+  - openssh-server
+  - curl
+  - ca-certificates
+  - less
+  - htop
+services:
+  - ssh
+commands:
+  - cmd: systemctl enable ssh
+    description: Автозапуск SSH

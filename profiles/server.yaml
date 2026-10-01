@@ -1,0 +1,16 @@
+name: server
+description: Серверная система на базе base
+extends: base
+packages:
+  - nginx
+  - ufw
+  - fail2ban
+  - unattended-upgrades
+services:
+  - nginx
+  - ufw
+  - fail2ban
+commands:
+  - cmd: ufw default deny incoming
+    description: Закрыть входящие подключения по умолчанию
+    optional: true
