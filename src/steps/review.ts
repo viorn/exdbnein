@@ -1,6 +1,6 @@
 import { note } from "@clack/prompts";
 import { validateConfig } from "../config/validate.ts";
-import { confirm } from "../ui/prompts.ts";
+import { backOption, isBack, select } from "../ui/prompts.ts";
 import type { Step, StepResult } from "../ui/wizard.ts";
 
 function formatSummary(config: import("../config/types.ts").InstallConfig): string {
@@ -27,18 +27,23 @@ export const reviewStep: Step = {
     const issues = validateConfig(config);
     if (issues.length > 0) {
       const text = issues.map((i) => `• ${i.path}: ${i.message}`).join("\n");
-      throw new Error(`Конфигурация невалидна:\n${text}`);
+      const hint = config.unattended
+        ? "\n\nВ авторежиме требуется полный конфиг (--config <file>)."
+        : "";
+      throw new Error(`Конфигурация невалидна:\n${text}${hint}`);
     }
 
     note(formatSummary(config), "План установки");
 
+    // В авторежиме ревью подтверждается автоматически.
     if (config.unattended) return { type: "continue" };
 
-    const ok = await confirm({ message: "Начать установку?", initialValue: false });
-    if (!ok) {
-      throw new Error("Установка отменена пользователем");
-    }
+    const choice = await select<string>({
+      message: "Начать установку?",
+      initialValue: "install",
+      options: [{ value: "install", label: "Начать установку" }, backOption()],
+    });
 
-    return { type: "continue" };
+    return isBack(choice) ? { type: "back" } : { type: "continue" };
   },
 };

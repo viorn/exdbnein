@@ -1,12 +1,46 @@
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { cancel, log } from "@clack/prompts";
 import { helpText, parseArgs } from "./cli.ts";
 import { defaultConfig, loadConfig, saveConfig } from "./config/index.ts";
+import type { InstallConfig } from "./config/types.ts";
 import { buildSteps } from "./steps/index.ts";
-import { CancelledError, runWizard } from "./ui/index.ts";
+import { CancelledError, confirm, runWizard } from "./ui/index.ts";
 
-/** Загружает конфиг, если файл существует, иначе начинает с значений по умолчанию. */
-async function loadOrInit(path: string) {
-  if (await Bun.file(path).exists()) return loadConfig(path);
+/** Черновик последней сессии — чтобы краш не терял ввод. */
+const DRAFT_FILE = join(tmpdir(), "exdbnein-last.json");
+
+/** Читает черновик предыдущей сессии, если он есть и валиден. */
+async function loadDraft(): Promise<InstallConfig | null> {
+  try {
+    if (!(await Bun.file(DRAFT_FILE).exists())) return null;
+    return await loadConfig(DRAFT_FILE);
+  } catch {
+    return null;
+  }
+}
+
+/** Загружает конфиг: файл --config, иначе черновик (с вопросом), иначе дефолты. */
+async function loadOrInit(options: {
+  config?: string;
+  unattended: boolean;
+}): Promise<InstallConfig> {
+  if (options.config) {
+    if (await Bun.file(options.config).exists()) return loadConfig(options.config);
+    return defaultConfig();
+  }
+
+  if (!options.unattended) {
+    const draft = await loadDraft();
+    if (draft) {
+      const restore = await confirm({
+        message: "Найдена незавершённая сессия. Восстановить?",
+        initialValue: true,
+      });
+      if (restore) return draft;
+    }
+  }
+
   return defaultConfig();
 }
 
@@ -18,7 +52,7 @@ async function main(): Promise<void> {
     return;
   }
 
-  const config = options.config ? await loadOrInit(options.config) : defaultConfig();
+  const config = await loadOrInit(options);
   config.unattended = options.unattended;
 
   await runWizard({
@@ -26,6 +60,8 @@ async function main(): Promise<void> {
     steps: buildSteps({ profilesDir: options.profilesDir }),
     config,
     onStepDone: async (_step, current) => {
+      // Черновик сохраняем всегда, --config — дополнительно.
+      await saveConfig(current, DRAFT_FILE);
       if (options.config) await saveConfig(current, options.config);
     },
   });

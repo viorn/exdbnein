@@ -18,9 +18,20 @@ export interface BuildStepsOptions {
   profilesDir: string;
 }
 
+/**
+ * В авторежиме шаги сбора конфигурации пропускаются целиком:
+ * при полном конфиге вопросов не будет, при неполном — ревью упадёт со списком проблем.
+ */
+function skipWhenUnattended(step: Step): Step {
+  return {
+    ...step,
+    skip: (config) => (config.unattended ? true : (step.skip?.(config) ?? false)),
+  };
+}
+
 /** Собирает список шагов визарда в порядке выполнения. */
 export function buildSteps(options: BuildStepsOptions): Step[] {
-  return [
+  const steps: Step[] = [
     diskStep,
     localeStep,
     networkStep,
@@ -28,4 +39,7 @@ export function buildSteps(options: BuildStepsOptions): Step[] {
     profilesStep({ dir: options.profilesDir }),
     reviewStep,
   ];
+
+  // Ревью в авторежиме выполняет проверку и авто-подтверждение, его не пропускаем.
+  return steps.map((step) => (step.id === "review" ? step : skipWhenUnattended(step)));
 }

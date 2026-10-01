@@ -1,5 +1,5 @@
 import type { NetworkConfig } from "../config/types.ts";
-import { select, text } from "../ui/prompts.ts";
+import { backOption, isBack, select, text } from "../ui/prompts.ts";
 import type { Step, StepResult } from "../ui/wizard.ts";
 
 export const networkStep: Step = {
@@ -18,15 +18,19 @@ export const networkStep: Step = {
       },
     });
 
-    config.network.manager = await select<NetworkConfig["manager"]>({
+    const manager = await select<string>({
       message: "Менеджер сети",
       initialValue: config.network.manager,
       options: [
         { value: "networkmanager", label: "NetworkManager", hint: "для десктопа" },
         { value: "systemd-networkd", label: "systemd-networkd", hint: "минималистично" },
         { value: "none", label: "Не настраивать" },
+        backOption(),
       ],
     });
+
+    if (isBack(manager)) return { type: "back" };
+    config.network.manager = manager as NetworkConfig["manager"];
 
     return { type: "continue" };
   },

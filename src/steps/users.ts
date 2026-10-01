@@ -50,7 +50,7 @@ export const usersStep: Step = {
 
       if (!result) {
         const back = await confirm({
-          message: "← Назад к паролю root?",
+          message: "Вернуться к предыдущему шагу?",
           initialValue: false,
         });
         if (back) return { type: "back" };

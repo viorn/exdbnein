@@ -50,12 +50,9 @@ export async function runWizard(options: WizardOptions): Promise<InstallConfig> 
     await options.onStepDone?.(step, config);
 
     if (result.type === "back") {
-      if (stack.length === 0) {
-        // Первый шаг — перезапускаем его (считаем выполненным)
-        continue;
-      } else {
-        i = stack.pop()!;
-      }
+      // На первом шаге возвращаться некуда — просто перезапускаем его.
+      const prev = stack.pop();
+      if (prev !== undefined) i = prev;
     } else {
       // При успешном шаге кладём в стек *текущий* шаг (куда вернёмся при back)
       stack.push(i);

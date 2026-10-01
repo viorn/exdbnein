@@ -12,7 +12,7 @@ describe("wizard back navigation", () => {
       async run() {
         callCount.set("a", (callCount.get("a") ?? 0) + 1);
         // Первый вызов — назад, второй — дальше
-        return callCount.get("a")! <= 1
+        return (callCount.get("a") ?? 0) <= 1
           ? ({ type: "back" } satisfies StepResult)
           : ({ type: "continue" } satisfies StepResult);
       },
@@ -46,7 +46,7 @@ describe("wizard back navigation", () => {
       title: "Шаг A",
       async run() {
         callCount.set("a", (callCount.get("a") ?? 0) + 1);
-        return callCount.get("a")! <= 1
+        return (callCount.get("a") ?? 0) <= 1
           ? ({ type: "back" } satisfies StepResult)
           : ({ type: "continue" } satisfies StepResult);
       },
@@ -79,7 +79,7 @@ describe("wizard back navigation", () => {
       title: "Шаг B",
       async run() {
         callCount.set("b", (callCount.get("b") ?? 0) + 1);
-        return callCount.get("b")! <= 1
+        return (callCount.get("b") ?? 0) <= 1
           ? ({ type: "back" } satisfies StepResult)
           : ({ type: "continue" } satisfies StepResult);
       },
@@ -90,7 +90,7 @@ describe("wizard back navigation", () => {
       title: "Шаг C",
       async run() {
         callCount.set("c", (callCount.get("c") ?? 0) + 1);
-        return callCount.get("c")! <= 1
+        return (callCount.get("c") ?? 0) <= 1
           ? ({ type: "back" } satisfies StepResult)
           : ({ type: "continue" } satisfies StepResult);
       },

@@ -1,4 +1,4 @@
-import { text } from "../ui/prompts.ts";
+import { backOption, isBack, select, text } from "../ui/prompts.ts";
 import type { Step, StepResult } from "../ui/wizard.ts";
 
 export const localeStep: Step = {
@@ -23,6 +23,10 @@ export const localeStep: Step = {
       placeholder: "Europe/Moscow",
     });
 
-    return { type: "continue" };
+    const next = await select<string>({
+      message: "Продолжить?",
+      options: [{ value: "next", label: "Продолжить" }, backOption()],
+    });
+    return isBack(next) ? { type: "back" } : { type: "continue" };
   },
 };
