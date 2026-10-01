@@ -105,7 +105,8 @@ export function defaultConfig(): InstallConfig {
     profiles: [],
     bootloader: {
       type: "grub",
-      osProber: true,
+      // По умолчанию выключен: медленный и чувствителен к EFI-переменным (P6.2).
+      osProber: false,
     },
     mirror: "http://deb.debian.org/debian",
     unattended: false,

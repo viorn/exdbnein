@@ -97,7 +97,7 @@ exdbnein/
 | 3 | Определение окружения | ✅ | [phase3.md](phase3.md) |
 | 4 | Разметка диска | ✅ | [phase4.md](phase4.md) |
 | 5 | Установка базовой системы | ✅ | [phase5.md](phase5.md) |
-| 6 | Настройка системы | ⬜ | [phase6.md](phase6.md) |
+| 6 | Настройка системы | ✅ | [phase6.md](phase6.md) |
 | 7 | Пост-установка и завершение | ⬜ | [phase7.md](phase7.md) |
 | 8 | Сборка LiveCD | ⬜ | [phase8.md](phase8.md) |
 | 9 | Тестирование и автоматизация | ⬜ | [phase9.md](phase9.md) |
@@ -143,8 +143,13 @@ UEFI → GPT + ESP + `/` (+swap), BIOS → MBR + `/` (+swap); btrfs subvolumes
 `debootstrap` и `debian-archive-keyring` (P5.1). Подробности — [phase5.md](phase5.md).
 
 ### Этап 6 — Настройка системы
-hostname, locale/keymap/timezone (debconf-пресеты), пользователи и sudo, сеть, GRUB
-(BIOS/UEFI), os-prober выключен по умолчанию.
+Реализован: стадия [`configureSystemStage`](../src/install/configure.ts) — hostname и `/etc/hosts`,
+debconf-пресеты (P6.1) для locales/console-setup/keyboard-configuration/tzdata (+grub-pc в BIOS),
+locale-gen, раскладка через `/etc/default/keyboard`, timezone симлинком `/etc/localtime`,
+пароли root и пользователей хешами (`usermod -p`/`useradd -p`, сверка с `/etc/shadow`),
+SSH-ключи с правами 700/600 (P6.3), сеть (NetworkManager или systemd-networkd+resolved),
+GRUB (BIOS — i386-pc, UEFI — x86_64-efi + fallback EFI/BOOT/BOOTX64.EFI) с os-prober
+выключенным по умолчанию (P6.2). Подробности — [phase6.md](phase6.md).
 
 ### Этап 7 — Пост-установка
 Применение профилей (пакеты, сервисы, команды в chroot, файлы с префиксом целевого корня),
