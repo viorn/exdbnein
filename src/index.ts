@@ -5,6 +5,7 @@ import { helpText, parseArgs } from "./cli.ts";
 import { defaultConfig, loadConfig, saveConfig } from "./config/index.ts";
 import type { InstallConfig } from "./config/types.ts";
 import { buildSteps } from "./steps/index.ts";
+import { isLiveEnvironment, isRoot, LIVE_MARKER } from "./system/environment.ts";
 import { CancelledError, confirm, runWizard } from "./ui/index.ts";
 
 /** Черновик последней сессии — чтобы краш не терял ввод. */
@@ -44,6 +45,22 @@ async function loadOrInit(options: {
   return defaultConfig();
 }
 
+/** Pre-flight: безопасность перед запуском визарда (этап 3). */
+async function checkEnvironment(force: boolean): Promise<void> {
+  const root = await isRoot();
+  if (!root) {
+    throw new Error("Требуются права root — установщик изменяет систему");
+  }
+
+  const live = await isLiveEnvironment();
+  if (!live && !force) {
+    throw new Error(
+      `Установщик запускается только внутри LiveCD (маркер ${LIVE_MARKER} не найден). ` +
+        "Для разработки используйте --force.",
+    );
+  }
+}
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
 
@@ -51,6 +68,8 @@ async function main(): Promise<void> {
     console.log(helpText());
     return;
   }
+
+  await checkEnvironment(options.force);
 
   const config = await loadOrInit(options);
   config.unattended = options.unattended;

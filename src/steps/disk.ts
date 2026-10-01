@@ -1,20 +1,47 @@
+import { note } from "@clack/prompts";
 import type { Filesystem } from "../config/types.ts";
-import { confirm, select, text } from "../ui/prompts.ts";
+import type { DiskInfo } from "../system/disks.ts";
+import { detectFirmware, listDisks } from "../system/index.ts";
+import { backOption, confirm, isBack, select, text } from "../ui/prompts.ts";
 import type { Step, StepResult } from "../ui/wizard.ts";
 
 export const diskStep: Step = {
   id: "disk",
   title: "Целевой диск",
   async run({ config }): Promise<StepResult> {
-    config.disk.device = await text({
-      message: "Устройство для установки",
-      placeholder: "/dev/sda",
-      validate: (value) => {
-        if (!value) return "Укажите устройство";
-        if (!value.startsWith("/dev/")) return "Путь должен начинаться с /dev/";
-        return undefined;
-      },
+    let disks: DiskInfo[];
+    try {
+      disks = await listDisks();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new Error(`Ошибка определения дисков: ${message}`);
+    }
+
+    // Носитель LiveCD и системный диск текущей ОС исключаем из выбора.
+    const candidates = disks.filter((disk) => !disk.isLiveMedium);
+    const firmware = await detectFirmware();
+    note(`Прошивка: ${firmware === "uefi" ? "UEFI" : "BIOS"}`, "Окружение");
+
+    if (candidates.length === 0) {
+      throw new Error("Не найдено подходящих дисков (носитель LiveCD и системный диск исключены)");
+    }
+
+    const device = await select<string>({
+      message: "Целевой диск",
+      options: [
+        ...candidates.map((disk) => ({
+          value: disk.path,
+          label: disk.path,
+          hint: [disk.size, disk.model, disk.tran, disk.removable ? "съёмный" : undefined]
+            .filter((part): part is string => Boolean(part))
+            .join(", "),
+        })),
+        backOption(),
+      ],
     });
+
+    if (isBack(device)) return { type: "back" };
+    config.disk.device = device;
 
     const fs = await select<string>({
       message: "Файловая система",
@@ -22,13 +49,11 @@ export const diskStep: Step = {
       options: [
         { value: "btrfs", label: "btrfs", hint: "subvolumes, снапшоты, сжатие" },
         { value: "ext4", label: "ext4", hint: "простая и проверенная" },
-        { value: "back", label: "← Назад", hint: "к выбору устройства" },
+        backOption(),
       ],
     });
 
-    if (fs === "back") {
-      return { type: "back" } satisfies StepResult;
-    }
+    if (isBack(fs)) return { type: "back" };
 
     config.disk.filesystem = fs as Filesystem;
 

@@ -5,6 +5,8 @@ export interface CliOptions {
   profilesDir: string;
   /** Авторежим без вопросов. */
   unattended: boolean;
+  /** Разрешить запуск вне LiveCD (для разработки). */
+  force: boolean;
   help: boolean;
 }
 
@@ -19,6 +21,7 @@ const HELP = `exdbnein — консольный установщик Debian
   -c, --config <file>       Загрузить/сохранить конфигурацию в JSON
   -p, --profiles-dir <dir>  Каталог с YAML-профилями (по умолчанию: ${DEFAULT_PROFILES_DIR})
   -y, --unattended          Авторежим: без вопросов, использовать загруженный конфиг
+  -f, --force               Разрешить запуск вне LiveCD (для разработки)
   -h, --help                Показать эту справку
 `;
 
@@ -26,6 +29,7 @@ export function parseArgs(argv: string[]): CliOptions {
   const options: CliOptions = {
     profilesDir: DEFAULT_PROFILES_DIR,
     unattended: false,
+    force: false,
     help: false,
   };
 
@@ -43,6 +47,10 @@ export function parseArgs(argv: string[]): CliOptions {
       case "-y":
       case "--unattended":
         options.unattended = true;
+        break;
+      case "-f":
+      case "--force":
+        options.force = true;
         break;
       case "-h":
       case "--help":

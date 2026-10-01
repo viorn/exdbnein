@@ -4,7 +4,12 @@ import { parseArgs } from "../src/cli.ts";
 describe("parseArgs", () => {
   test("значения по умолчанию", () => {
     const options = parseArgs([]);
-    expect(options).toEqual({ profilesDir: "profiles", unattended: false, help: false });
+    expect(options).toEqual({
+      profilesDir: "profiles",
+      unattended: false,
+      force: false,
+      help: false,
+    });
   });
 
   test("короткие и длинные флаги", () => {
@@ -14,6 +19,8 @@ describe("parseArgs", () => {
     expect(parseArgs(["--profiles-dir", "my-profiles"]).profilesDir).toBe("my-profiles");
     expect(parseArgs(["-y"]).unattended).toBe(true);
     expect(parseArgs(["--unattended"]).unattended).toBe(true);
+    expect(parseArgs(["-f"]).force).toBe(true);
+    expect(parseArgs(["--force"]).force).toBe(true);
     expect(parseArgs(["-h"]).help).toBe(true);
   });
 

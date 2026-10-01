@@ -1,5 +1,6 @@
 import { note } from "@clack/prompts";
 import { validateConfig } from "../config/validate.ts";
+import { checkNetwork } from "../system/environment.ts";
 import { backOption, isBack, select } from "../ui/prompts.ts";
 import type { Step, StepResult } from "../ui/wizard.ts";
 
@@ -31,6 +32,12 @@ export const reviewStep: Step = {
         ? "\n\nВ авторежиме требуется полный конфиг (--config <file>)."
         : "";
       throw new Error(`Конфигурация невалидна:\n${text}${hint}`);
+    }
+
+    // Мягкое предупреждение о недоступном зеркале (не блокирует установку).
+    const reachable = await checkNetwork(config.mirror, 5000);
+    if (!reachable) {
+      note("Зеркало недоступно — проверьте сеть или укажите другое зеркало.", "Предупреждение");
     }
 
     note(formatSummary(config), "План установки");
