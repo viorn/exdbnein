@@ -98,7 +98,7 @@ exdbnein/
 | 4 | Разметка диска | ✅ | [phase4.md](phase4.md) |
 | 5 | Установка базовой системы | ✅ | [phase5.md](phase5.md) |
 | 6 | Настройка системы | ✅ | [phase6.md](phase6.md) |
-| 7 | Пост-установка и завершение | ⬜ | [phase7.md](phase7.md) |
+| 7 | Пост-установка и завершение | ✅ | [phase7.md](phase7.md) |
 | 8 | Сборка LiveCD | ⬜ | [phase8.md](phase8.md) |
 | 9 | Тестирование и автоматизация | ⬜ | [phase9.md](phase9.md) |
 
@@ -152,8 +152,13 @@ GRUB (BIOS — i386-pc, UEFI — x86_64-efi + fallback EFI/BOOT/BOOTX64.EFI) с 
 выключенным по умолчанию (P6.2). Подробности — [phase6.md](phase6.md).
 
 ### Этап 7 — Пост-установка
-Применение профилей (пакеты, сервисы, команды в chroot, файлы с префиксом целевого корня),
-хуки, очистка, размонтирование и reboot; стратегия ошибок вместо rollback.
+Реализован: стадия [`postInstallStage`](../src/install/postinstall.ts) — применение профилей
+(пакеты через apt-get, сервисы через systemctl enable, файлы writer'ом с префиксом `/mnt`
+(P7.1), команды через `chroot sh -c`), очистка (`apt clean`, временные файлы), маркер
+применённых команд `/var/lib/exdbnein/applied.json` (идемпотентность, P7.2), лог установки
+[`InstallLogger`](../src/system/log.ts). Финализация ([`finishInstall`](../src/install/finish.ts)):
+сводка, размонтирование и swapoff всегда (P7.3, finally), reboot по выбору.
+Подробности — [phase7.md](phase7.md).
 
 ### Этап 8 — LiveCD
 `build.sh`: live-система + скомпилированный бинарь установщика (`bun build --compile`),

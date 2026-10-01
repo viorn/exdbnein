@@ -5,7 +5,7 @@ import { chrootMounts, inChroot, isMounted, TARGET_ROOT } from "./chroot.ts";
 import type { Firmware } from "./environment.ts";
 import { exec } from "./exec.ts";
 
-/** Действие плана этапа 5: команда, запись файла или генерация fstab. */
+/** Действие плана фазы B: команда, запись файла или генерация fstab. */
 export interface PlannedAction {
   description: string;
   /** Команда для выполнения в отдельной группе процессов (см. run.ts). */
@@ -16,6 +16,8 @@ export interface PlannedAction {
   generateFstab?: boolean;
   /** Лимит времени для argv (по умолчанию — 30 минут). */
   timeoutMs?: number;
+  /** Ошибка выполнения не прерывает установку (команды профилей с optional). */
+  optional?: boolean;
 }
 
 /** Кодовое имя стабильного Debian для debootstrap/apt. */

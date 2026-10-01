@@ -4,5 +4,8 @@ export * from "./configure.ts";
 export * from "./disks.ts";
 export * from "./environment.ts";
 export * from "./exec.ts";
+export * from "./finalize.ts";
 export * from "./fstab.ts";
+export * from "./log.ts";
+export * from "./postinstall.ts";
 export * from "./run.ts";

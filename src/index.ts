@@ -91,8 +91,11 @@ async function main(): Promise<void> {
     log.success(`Конфигурация сохранена: ${options.config}`);
   }
 
-  // Фаза B: применение конфигурации (этап 4 — подготовка диска и далее).
-  await runInstall(config, { interactive: !config.unattended });
+  // Фаза B: применение конфигурации (этапы 4–7).
+  await runInstall(config, {
+    interactive: !config.unattended,
+    profilesDir: options.profilesDir,
+  });
 }
 
 try {
