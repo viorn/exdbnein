@@ -91,6 +91,120 @@ describe("parseLsblkOutput", () => {
     expect(sda?.removable).toBe(false);
     expect(disks.find((disk) => disk.name === "sdb")?.removable).toBe(true);
   });
+
+  test("isLive=true: диск с mountpoint '/' помечается как LiveCD", () => {
+    const json = `{
+      "blockdevices": [
+        {
+          "name": "sda",
+          "path": "/dev/sda",
+          "size": "100G",
+          "type": "disk",
+          "rm": "0",
+          "mountpoints": null,
+          "children": [
+            {
+              "name": "sda1",
+              "path": "/dev/sda1",
+              "size": "100G",
+              "type": "part",
+              "mountpoints": ["/"]
+            }
+          ]
+        }
+      ]
+    }`;
+    const disks = parseLsblkOutput(json, true);
+    expect(disks[0]?.isLiveMedium).toBe(true);
+  });
+
+  test("isLive=false: диск с mountpoint '/' НЕ помечается как LiveCD", () => {
+    const json = `{
+      "blockdevices": [
+        {
+          "name": "sda",
+          "path": "/dev/sda",
+          "size": "100G",
+          "type": "disk",
+          "rm": "0",
+          "mountpoints": null,
+          "children": [
+            {
+              "name": "sda1",
+              "path": "/dev/sda1",
+              "size": "100G",
+              "type": "part",
+              "mountpoints": ["/"]
+            }
+          ]
+        }
+      ]
+    }`;
+    const disks = parseLsblkOutput(json, false);
+    expect(disks[0]?.isLiveMedium).toBe(false);
+  });
+
+  test("isLive=false: /cdrom и /media/* всё равно исключаются", () => {
+    const json = `{
+      "blockdevices": [
+        {
+          "name": "sda",
+          "path": "/dev/sda",
+          "size": "100G",
+          "type": "disk",
+          "rm": "0",
+          "mountpoints": null,
+          "children": [
+            {
+              "name": "sda1",
+              "path": "/dev/sda1",
+              "size": "100G",
+              "type": "part",
+              "mountpoints": ["/cdrom"]
+            }
+          ]
+        },
+        {
+          "name": "sdb",
+          "path": "/dev/sdb",
+          "size": "50G",
+          "type": "disk",
+          "rm": "0",
+          "mountpoints": null,
+          "children": [
+            {
+              "name": "sdb1",
+              "path": "/dev/sdb1",
+              "size": "50G",
+              "type": "part",
+              "mountpoints": ["/media/usb"]
+            }
+          ]
+        },
+        {
+          "name": "sdc",
+          "path": "/dev/sdc",
+          "size": "200G",
+          "type": "disk",
+          "rm": "0",
+          "mountpoints": null,
+          "children": [
+            {
+              "name": "sdc1",
+              "path": "/dev/sdc1",
+              "size": "200G",
+              "type": "part",
+              "mountpoints": ["/home"]
+            }
+          ]
+        }
+      ]
+    }`;
+    const disks = parseLsblkOutput(json, false);
+    expect(disks.find((d) => d.name === "sda")?.isLiveMedium).toBe(true);
+    expect(disks.find((d) => d.name === "sdb")?.isLiveMedium).toBe(true);
+    expect(disks.find((d) => d.name === "sdc")?.isLiveMedium).toBe(false);
+  });
 });
 
 describe("partitionPath", () => {

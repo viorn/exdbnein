@@ -1,6 +1,7 @@
 import type { DiskConfig, Filesystem, InstallConfig } from "../config/types.ts";
 import { isMounted, TARGET_ROOT } from "./chroot.ts";
 import type { Firmware } from "./environment.ts";
+import { isLiveEnvironment } from "./environment.ts";
 import { exec } from "./exec.ts";
 
 /** Disk information from lsblk. */
@@ -48,12 +49,14 @@ const LSBLK_COLUMNS = [
 ];
 
 /** Parses `lsblk -J` output into a list of disks (only type=disk). */
-export function parseLsblkOutput(json: string): DiskInfo[] {
+export function parseLsblkOutput(json: string, isLive = true): DiskInfo[] {
   const parsed = JSON.parse(json) as { blockdevices?: LsblkNode[] };
-  return (parsed.blockdevices ?? []).filter((node) => node.type === "disk").map(toDiskInfo);
+  return (parsed.blockdevices ?? [])
+    .filter((node) => node.type === "disk")
+    .map((node) => toDiskInfo(node, isLive));
 }
 
-function toDiskInfo(node: LsblkNode): DiskInfo {
+function toDiskInfo(node: LsblkNode, isLive = true): DiskInfo {
   return {
     name: node.name,
     path: node.path || `/dev/${node.name}`,
@@ -62,7 +65,7 @@ function toDiskInfo(node: LsblkNode): DiskInfo {
     removable: node.rm === "1",
     tran: node.tran,
     model: node.model,
-    isLiveMedium: hasLiveMountpoint(node),
+    isLiveMedium: hasLiveMountpoint(node, isLive),
   };
 }
 
@@ -70,9 +73,17 @@ function toDiskInfo(node: LsblkNode): DiskInfo {
  * The LiveCD medium — a disk where the system root ("/"),
  * live partitions (/run/live*), CD (/cdrom) or removable media (/media/*) are mounted.
  * Such disks cannot be selected as the installation target.
+ *
+ * When `isLive` is false (running outside LiveCD, e.g. `--force`), only removable
+ * media (/media/*) and /cdrom are excluded — the host system disk (mounted at "/")
+ * is NOT treated as a LiveCD medium.
  */
-function hasLiveMountpoint(node: LsblkNode): boolean {
+function hasLiveMountpoint(node: LsblkNode, isLive = true): boolean {
   const mounts = collectMountpoints(node);
+  if (!isLive) {
+    // Outside LiveCD: exclude only removable media and /cdrom.
+    return mounts.some((m) => m === "/cdrom" || m.startsWith("/media/"));
+  }
   return mounts.some(
     (mount) =>
       mount === "/" ||
@@ -103,7 +114,8 @@ export async function listDisks(): Promise<DiskInfo[]> {
   if (result.code !== 0) {
     throw new Error(`Failed to list disks: ${result.stderr.trim()}`);
   }
-  return parseLsblkOutput(result.stdout);
+  const isLive = await isLiveEnvironment();
+  return parseLsblkOutput(result.stdout, isLive);
 }
 
 // ---- Stage 4: disk partitioning ----------------------------------------------
