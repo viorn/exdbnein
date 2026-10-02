@@ -108,7 +108,7 @@ describe("wizard back navigation", () => {
     expect(callCount.get("c")).toBe(2);
   });
 
-  test("onStepDone вызывается при каждом выполнении шага", async () => {
+  test("onStepDone вызывается только при continue, не при back", async () => {
     const doneCalls: string[] = [];
     const callCount = { value: 0 };
 
@@ -133,7 +133,7 @@ describe("wizard back navigation", () => {
       },
     });
 
-    // onStepDone вызывается дважды (два выполнения шага)
-    expect(doneCalls).toEqual(["s", "s"]);
+    // onStepDone вызывается один раз — только при continue (второй вызов run)
+    expect(doneCalls).toEqual(["s"]);
   });
 });

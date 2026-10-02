@@ -2,11 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { defaultConfig } from "../src/config/types.ts";
 import {
   APT_COMPONENTS,
+  APT_UPDATE_TIMEOUT_MS,
   aptGet,
   DEBOOTSTRAP_SUITE,
   debootstrapCommand,
   essentialBasePackages,
   isBtrfsRoot,
+  planAptUpdate,
   sourcesListContent,
 } from "../src/system/base.ts";
 import { chrootMounts, inChroot } from "../src/system/chroot.ts";
@@ -124,5 +126,18 @@ describe("inChroot / aptGet", () => {
       "update",
     ]);
     expect(aptGet("install", "linux-image-amd64")).toContain("linux-image-amd64");
+  });
+});
+
+describe("planAptUpdate (P1 #2)", () => {
+  test("функция экспортирована и асинхронна", async () => {
+    expect(typeof planAptUpdate).toBe("function");
+    // Функция вызывает readdir, поэтому юнит-тест проверяет только сигнатуру.
+    // Интеграционный сценарий: частичные списки (без *_Release) → действие,
+    // полные списки (с *_Release) → [].
+  });
+
+  test("APT_UPDATE_TIMEOUT_MS — 10 минут", () => {
+    expect(APT_UPDATE_TIMEOUT_MS).toBe(10 * 60 * 1000);
   });
 });

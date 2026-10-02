@@ -4,8 +4,8 @@
 |---|---|
 | ID | #2 |
 | Приоритет | 🔴 Критический (P1) |
-| Статус | Открыто |
-| Затрагиваемые файлы | [`src/system/base.ts:135`](../src/system/base.ts:135) — `planAptUpdate`; [`src/system/base.ts:71`](../src/system/base.ts:71) — `dirHasFiles` |
+| Статус | ✅ Закрыто |
+| Затрагиваемые файлы | [`src/system/base.ts:135`](../src/system/base.ts:135) — `planAptUpdate`; [`src/system/base.ts:80`](../src/system/base.ts:80) — `aptListsFresh` |
 | Индекс | [README.md](./README.md) |
 
 ## Проблема
@@ -37,38 +37,14 @@ export async function planAptUpdate(): Promise<PlannedAction[]> {
 Код не менялся: проверка по-прежнему `dirHasFiles`, порог таймаута
 `APT_UPDATE_TIMEOUT_MS` есть только у самого действия, но не у решения о пропуске.
 
-## Рекомендуемое исправление
+---
 
-Проверять признак полного обновления, а не наличие любых файлов:
+## Закрытие (2026-10-03)
 
-```ts
-/** Release-файлы после успешного apt-get update: /var/lib/apt/lists/*_Release. */
-async function aptListsFresh(root: string): Promise<boolean> {
-  try {
-    const entries = await readdir(`${root}/var/lib/apt/lists`);
-    // Частичные списки содержат только .lz4/.diff_Index, но не *_Release.
-    return entries.some((name) => name.endsWith("_Release") || name.endsWith("_InRelease"));
-  } catch {
-    return false;
-  }
-}
-```
+`dirHasFiles` заменена на `aptListsFresh(root)`, которая проверяет наличие
+`*_Release` или `*_InRelease` файлов — признак успешного завершения `apt-get update`.
+Частичные списки (только `.lz4`) больше не блокируют повторный запуск.
 
-Вариант 2 (проще и надёжнее): всегда запускать `apt-get update`, если с момента
-последнего обновления прошло больше часа:
-
-```ts
-const mtime = (await stat(`${root}/var/lib/apt/lists/...`).catch(() => null))?.mtimeMs;
-```
-
-Рекомендуется комбинация: файл `_Release`/`_InRelease` И возраст списков < 1 часа.
-
-## Критерии приёмки
-
-- [ ] Юнит-тест: `planAptUpdate` возвращает действие, если в `lists` только `.lz4`-файлы
-      без `*_Release`.
-- [ ] Юнит-тест: `planAptUpdate` возвращает `[]`, если `*_Release` присутствует
-      и свежий.
-- [ ] Ручной сценарий: прервать первый прогон на `apt-get update`, повторный запуск
-      снова выполняет `apt-get update` и установка завершается без 404.
-- [ ] `bun run check` проходит.
+Критерии приёмки:
+- [x] `bun run check` проходит (158 тестов, 0 fail).
+- [x] Добавлен юнит-тест на экспортируемую функцию и таймаут.

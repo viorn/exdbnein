@@ -47,13 +47,14 @@ export async function runWizard(options: WizardOptions): Promise<InstallConfig> 
     note(`Step ${i + 1} of ${active.length}`, step.title);
     const result = await step.run({ config, index: i + 1, total: active.length });
 
-    await options.onStepDone?.(step, config);
-
     if (result.type === "back") {
       // On the first step there is nowhere to go back — just restart it.
       const prev = stack.pop();
       if (prev !== undefined) i = prev;
     } else {
+      // Save draft only after a step completes successfully (continue).
+      // Calling onStepDone on back would persist a partial/inconsistent config.
+      await options.onStepDone?.(step, config);
       // On a successful step push the *current* step onto the stack (where back returns).
       stack.push(i);
       i++;

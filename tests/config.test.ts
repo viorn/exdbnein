@@ -82,4 +82,23 @@ describe("serialize", () => {
     expect(parsed.disk.filesystem).toBe("btrfs");
     expect(parsed.network.hostname).toBe("debian");
   });
+
+  test("parseConfig отбрасывает legacy plaintext password из JSON", () => {
+    const json = JSON.stringify({
+      version: CONFIG_VERSION,
+      disk: { device: "/dev/sda" },
+      users: [
+        {
+          username: "user",
+          password: "secret",
+          passwordHash: "$6$salt$hash",
+          sudo: true,
+          sshKeys: [],
+        },
+      ],
+    });
+    const parsed = parseConfig(json);
+    expect(parsed.users[0]?.password).toBeUndefined();
+    expect(parsed.users[0]?.passwordHash).toBe("$6$salt$hash");
+  });
 });

@@ -68,10 +68,17 @@ export async function isPackageInstalled(pkg: string, root = TARGET_ROOT): Promi
   return result.code === 0 && result.stdout.trim() === "install ok installed";
 }
 
-/** Whether the directory has any files (idempotency of apt lists). */
-async function dirHasFiles(dir: string): Promise<boolean> {
+/**
+ * Whether apt package lists are fully downloaded.
+ * A successful `apt-get update` creates `*_Release` or `*_InRelease` files.
+ * Partial downloads (interrupted by Ctrl+C, network failure, etc.) contain
+ * only `.lz4`/`.diff-Index` fragments without `_Release` — skipping update
+ * in that case leads to `404 Not Found` on subsequent `apt-get install`.
+ */
+async function aptListsFresh(root: string): Promise<boolean> {
   try {
-    return (await readdir(dir)).length > 0;
+    const entries = await readdir(`${root}/var/lib/apt/lists`);
+    return entries.some((name) => name.endsWith("_Release") || name.endsWith("_InRelease"));
   } catch {
     return false;
   }
@@ -132,9 +139,9 @@ export function aptGet(...args: string[]): string[] {
   return inChroot(["env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "-y", ...args]);
 }
 
-/** apt-get update — only if the package lists are not downloaded yet. */
+/** apt-get update — only if the package lists are fully downloaded. */
 export async function planAptUpdate(): Promise<PlannedAction[]> {
-  if (await dirHasFiles(`${TARGET_ROOT}/var/lib/apt/lists`)) return [];
+  if (await aptListsFresh(TARGET_ROOT)) return [];
   return [
     {
       description: "Update package lists (apt-get update)",
