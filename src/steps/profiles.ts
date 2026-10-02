@@ -5,28 +5,28 @@ import { backOption, isBack, multiselect, select } from "../ui/prompts.ts";
 import type { Step, StepResult } from "../ui/wizard.ts";
 
 export interface ProfilesStepOptions {
-  /** Каталог с YAML-профилями. */
+  /** Directory with YAML profiles. */
   dir: string;
 }
 
 export function profilesStep(options: ProfilesStepOptions): Step {
   return {
     id: "profiles",
-    title: "Профили",
+    title: "Profiles",
     async run({ config }): Promise<StepResult> {
       let profiles: Map<string, Profile>;
       try {
-        // P8.1: каталог profiles/ есть в dev, в LiveCD работают встроенные профили.
+        // P8.1: the profiles/ directory exists in dev; the LiveCD uses embedded profiles.
         profiles = await loadProfilesOrDefault(options.dir);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`Ошибка загрузки профилей: ${message}`);
+        throw new Error(`Failed to load profiles: ${message}`);
       }
 
       if (profiles.size === 0) return { type: "continue" };
 
       const selected = await multiselect({
-        message: "Наборы софта",
+        message: "Software sets",
         options: [...profiles.values()].map((profile) => ({
           value: profile.name,
           label: profile.name,
@@ -37,16 +37,16 @@ export function profilesStep(options: ProfilesStepOptions): Step {
       });
       config.profiles = selected;
 
-      // Предпросмотр итогового набора после резолва наследования.
+      // Preview of the merged set after resolving inheritance.
       const merged = resolveProfiles(config.profiles, profiles);
-      const packages = merged.packages.length ? merged.packages.join(", ") : "нет";
-      const commands = merged.commands.length ? `${merged.commands.length} команд(ы)` : "нет";
-      const files = merged.files.length ? `${merged.files.length} файл(а)` : "нет";
-      note(`Пакеты: ${packages}\nКоманды: ${commands}\nФайлы: ${files}`, "Итоговый набор профилей");
+      const packages = merged.packages.length ? merged.packages.join(", ") : "none";
+      const commands = merged.commands.length ? `${merged.commands.length} command(s)` : "none";
+      const files = merged.files.length ? `${merged.files.length} file(s)` : "none";
+      note(`Packages: ${packages}\nCommands: ${commands}\nFiles: ${files}`, "Merged profile set");
 
       const next = await select<string>({
-        message: "Продолжить?",
-        options: [{ value: "next", label: "Продолжить" }, backOption()],
+        message: "Continue?",
+        options: [{ value: "next", label: "Continue" }, backOption()],
       });
       return isBack(next) ? { type: "back" } : { type: "continue" };
     },

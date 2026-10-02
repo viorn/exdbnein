@@ -9,20 +9,20 @@ const EMPTY_COLLECTIONS = {
   files: [],
 } as const;
 
-/** Парсит и валидирует один YAML-профиль. Бросает ошибку с описанием проблем. */
+/** Parses and validates a single YAML profile. Throws an error describing the issues. */
 export function parseProfile(name: string, text: string): Profile {
   const parsed: unknown = parse(text);
   const issues = validateProfile(name, parsed);
   if (issues.length > 0) {
     const list = issues.map((issue) => `• ${issue.path}: ${issue.message}`).join("\n");
-    throw new Error(`Профиль ${name} невалиден:\n${list}`);
+    throw new Error(`Profile ${name} is invalid:\n${list}`);
   }
   return { ...EMPTY_COLLECTIONS, ...(parsed as Profile), name };
 }
 
 /**
- * Загружает профили из каталога (*.yaml, *.yml) и валидирует каждый.
- * При любой ошибке бросает исключение с указанием файла.
+ * Loads profiles from a directory (*.yaml, *.yml) and validates each one.
+ * On any error throws an exception naming the file.
  */
 export async function loadProfiles(dir: string): Promise<Map<string, Profile>> {
   const glob = new Bun.Glob("*.{yaml,yml}");
@@ -34,7 +34,7 @@ export async function loadProfiles(dir: string): Promise<Map<string, Profile>> {
     const name = typeof raw?.name === "string" ? raw.name : "";
 
     if (!name) {
-      throw new Error(`Профиль ${file}: отсутствует поле name`);
+      throw new Error(`Profile ${file}: missing name field`);
     }
 
     profiles.set(name, parseProfile(name, text));

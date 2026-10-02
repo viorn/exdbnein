@@ -1,6 +1,6 @@
-/** Пользователь прервал работу (Ctrl+C или выбор «Отмена»). */
+/** User cancelled the run (Ctrl+C or choosing "Cancel"). */
 export class CancelledError extends Error {
-  constructor(message = "Установка отменена") {
+  constructor(message = "Installation cancelled") {
     super(message);
     this.name = "CancelledError";
   }

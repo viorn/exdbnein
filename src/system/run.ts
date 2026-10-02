@@ -3,25 +3,25 @@ import { CancelledError } from "../ui/errors.ts";
 import { ExecError, type ExecResult } from "./exec.ts";
 
 export interface RunLongOptions {
-  /** Заголовок спиннера во время выполнения. */
+  /** Spinner title while running. */
   label: string;
-  /** Лимит времени в мс; по истечении вся группа процессов завершается принудительно. */
+  /** Time limit in ms; after it expires the whole process group is killed. */
   timeoutMs?: number;
   cwd?: string;
   env?: Record<string, string>;
-  /** Не бросать исключение при ненулевом коде выхода. */
+  /** Do not throw on a non-zero exit code. */
   allowFailure?: boolean;
 }
 
-/** Лимит по умолчанию для долгих операций (debootstrap/apt идут минутами). */
+/** Default limit for long operations (debootstrap/apt run for minutes). */
 export const DEFAULT_TIMEOUT_MS = 30 * 60 * 1000;
 
 /**
- * Выполняет долгую команду в отдельной группе процессов (P5.4): спиннер,
- * таймаут и kill-группа при Ctrl+C — дочерние процессы не осиротевают.
+ * Runs a long command in a separate process group (P5.4): spinner,
+ * timeout and kill-group on Ctrl+C — child processes are not orphaned.
  *
- * Команда запускается через `setsid`, чтобы стать лидером новой сессии/группы;
- * завершение идёт сигналом на отрицательный pid (вся группа целиком).
+ * The command is started via `setsid` to become the leader of a new session/group;
+ * termination sends a signal to the negative pid (the whole group).
  */
 export async function runLong(command: string[], options: RunLongOptions): Promise<ExecResult> {
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -37,14 +37,14 @@ export async function runLong(command: string[], options: RunLongOptions): Promi
     try {
       process.kill(-groupPid, signal);
     } catch {
-      // группа уже завершилась
+      // the group has already exited
     }
   };
 
   const onSigint = (): void => {
     cancelled = true;
     killGroup("SIGTERM");
-    // Повторный Ctrl+C или «зависшая» очистка — жёсткое завершение.
+    // A second Ctrl+C or a "stuck" cleanup — hard kill.
     setTimeout(() => killGroup("SIGKILL"), 10_000).unref();
   };
 
@@ -72,20 +72,20 @@ export async function runLong(command: string[], options: RunLongOptions): Promi
     const result: ExecResult = { code, stdout, stderr };
 
     if (cancelled) {
-      progress?.stop("Отменено");
-      throw new CancelledError(`Операция отменена: ${options.label}`);
+      progress?.stop("Cancelled");
+      throw new CancelledError(`Operation cancelled: ${options.label}`);
     }
     if (timedOut) {
-      progress?.stop("Таймаут");
+      progress?.stop("Timeout");
       throw new Error(
-        `Операция превысила лимит времени (${Math.round(timeoutMs / 1000)} с) и остановлена: ${options.label}`,
+        `Operation exceeded the time limit (${Math.round(timeoutMs / 1000)} s) and was stopped: ${options.label}`,
       );
     }
     if (code !== 0 && !options.allowFailure) {
-      progress?.stop("Ошибка");
+      progress?.stop("Error");
       throw new ExecError(command.join(" "), result);
     }
-    progress?.stop("Выполнено");
+    progress?.stop("Done");
     return result;
   } finally {
     clearTimeout(timer);

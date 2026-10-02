@@ -1,5 +1,5 @@
 name: server
-description: Серверная система на базе base
+description: Server system on top of base
 extends: base
 packages:
   - nginx
@@ -12,5 +12,5 @@ services:
   - fail2ban
 commands:
   - cmd: ufw default deny incoming
-    description: Закрыть входящие подключения по умолчанию
+    description: Deny incoming connections by default
     optional: true

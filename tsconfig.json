@@ -26,5 +26,8 @@
     "noUnusedLocals": false,
     "noUnusedParameters": false,
     "noPropertyAccessFromIndexSignature": false
-  }
+  },
+  // Build artifacts and dependencies are ignored (see .gitignore) —
+  // otherwise tsc would scan the live-root tree under out/.
+  "exclude": ["node_modules", "out", "dist"]
 }

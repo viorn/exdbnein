@@ -1,47 +1,47 @@
 import type { Firmware } from "./environment.ts";
 import { exec } from "./exec.ts";
 
-/** Корень целевой системы (точка монтирования во время установки). */
+/** Target system root (mount point during installation). */
 export const TARGET_ROOT = "/mnt";
 
 export interface ChrootMount {
-  /** Точка монтирования внутри целевой системы. */
+  /** Mount point inside the target system. */
   target: string;
   description: string;
   argv: string[];
 }
 
 /**
- * Монтирования псевдо-ФС, необходимые для работы в chroot (P5.3):
- * apt/dpkg и скрипты пакетов видят /proc, /sys, /dev, /run.
- * Для UEFI обязателен bind-mount efivars — без него на этапе 6 не
- * установится GRUB (grub-install читает EFI-переменные).
+ * Pseudo-FS mounts needed to work inside the chroot (P5.3):
+ * apt/dpkg and package scripts see /proc, /sys, /dev, /run.
+ * For UEFI a bind-mount of efivars is mandatory — without it GRUB will not
+ * install at stage 6 (grub-install reads EFI variables).
  */
 export function chrootMounts(firmware: Firmware): ChrootMount[] {
   const mounts: ChrootMount[] = [
     {
       target: "/proc",
-      description: "Примонтировать /proc в chroot",
+      description: "Mount /proc into chroot",
       argv: ["mount", "-t", "proc", "proc", `${TARGET_ROOT}/proc`],
     },
     {
       target: "/sys",
-      description: "Примонтировать /sys в chroot",
+      description: "Mount /sys into chroot",
       argv: ["mount", "--bind", "/sys", `${TARGET_ROOT}/sys`],
     },
     {
       target: "/dev",
-      description: "Примонтировать /dev в chroot",
+      description: "Mount /dev into chroot",
       argv: ["mount", "--bind", "/dev", `${TARGET_ROOT}/dev`],
     },
     {
       target: "/dev/pts",
-      description: "Примонтировать /dev/pts в chroot",
+      description: "Mount /dev/pts into chroot",
       argv: ["mount", "-t", "devpts", "devpts", `${TARGET_ROOT}/dev/pts`],
     },
     {
       target: "/run",
-      description: "Примонтировать /run в chroot",
+      description: "Mount /run into chroot",
       argv: ["mount", "--bind", "/run", `${TARGET_ROOT}/run`],
     },
   ];
@@ -49,7 +49,7 @@ export function chrootMounts(firmware: Firmware): ChrootMount[] {
   if (firmware === "uefi") {
     mounts.push({
       target: "/sys/firmware/efi/efivars",
-      description: "Примонтировать /sys/firmware/efi/efivars в chroot (UEFI)",
+      description: "Mount /sys/firmware/efi/efivars into chroot (UEFI)",
       argv: [
         "mount",
         "--bind",
@@ -62,13 +62,13 @@ export function chrootMounts(firmware: Firmware): ChrootMount[] {
   return mounts;
 }
 
-/** Точка уже примонтирована (идемпотентность повторного входа). */
+/** The mount point is already mounted (idempotency of a re-entry). */
 export async function isMounted(path: string): Promise<boolean> {
   const result = await exec(["findmnt", "-n", path], { allowFailure: true });
   return result.code === 0;
 }
 
-/** Обёртка команды для выполнения внутри целевого корня. */
+/** Wraps a command for execution inside the target root. */
 export function inChroot(command: string[], root = TARGET_ROOT): string[] {
   return ["chroot", root, ...command];
 }

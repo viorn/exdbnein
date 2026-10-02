@@ -15,7 +15,7 @@ function diskOptions(disks: DiskInfo[]) {
   return disks.map((disk) => ({
     value: disk.path,
     label: disk.path,
-    hint: [disk.size, disk.model, disk.tran, disk.removable ? "съёмный" : undefined]
+    hint: [disk.size, disk.model, disk.tran, disk.removable ? "removable" : undefined]
       .filter((part): part is string => Boolean(part))
       .join(", "),
   }));
@@ -28,24 +28,24 @@ function partitionOptions(partitions: PartitionInfo[]) {
     hint: [
       partition.size,
       partition.fstype ?? "?",
-      partition.mountpoints.length ? `смонтирован: ${partition.mountpoints.join(",")}` : undefined,
+      partition.mountpoints.length ? `mounted: ${partition.mountpoints.join(",")}` : undefined,
     ]
       .filter((part): part is string => Boolean(part))
       .join(", "),
   }));
 }
 
-/** Схема keep: выбор существующих разделов, ничего не стирается. */
+/** Keep layout: pick existing partitions, nothing is wiped. */
 async function runKeep(config: InstallConfig, firmware: Firmware): Promise<StepResult> {
   const partitions = await listPartitions(config.disk.device);
   if (partitions.length === 0) {
     throw new Error(
-      `На диске ${config.disk.device} нет разделов — схема «оставить разделы» невозможна`,
+      `Disk ${config.disk.device} has no partitions — the "keep partitions" layout is impossible`,
     );
   }
 
   const root = await select<string>({
-    message: "Раздел для /",
+    message: "Partition for /",
     options: [...partitionOptions(partitions), backOption()],
   });
   if (isBack(root)) return { type: "back" };
@@ -54,9 +54,9 @@ async function runKeep(config: InstallConfig, firmware: Firmware): Promise<StepR
 
   if (firmware === "uefi") {
     const esp = await select<string>({
-      message: "Раздел ESP (/boot/efi)",
+      message: "ESP partition (/boot/efi)",
       options: [
-        { value: "none", label: "Нет ESP", hint: "осторожно: UEFI не загрузится без ESP" },
+        { value: "none", label: "No ESP", hint: "caution: UEFI won't boot without ESP" },
         ...partitionOptions(partitions),
         backOption(),
       ],
@@ -66,8 +66,8 @@ async function runKeep(config: InstallConfig, firmware: Firmware): Promise<StepR
   }
 
   const swap = await select<string>({
-    message: "Раздел подкачки",
-    options: [{ value: "none", label: "Без swap" }, ...partitionOptions(partitions), backOption()],
+    message: "Swap partition",
+    options: [{ value: "none", label: "No swap" }, ...partitionOptions(partitions), backOption()],
   });
   if (isBack(swap)) return { type: "back" };
   if (swap === "none") {
@@ -83,27 +83,27 @@ async function runKeep(config: InstallConfig, firmware: Firmware): Promise<StepR
 
 export const diskStep: Step = {
   id: "disk",
-  title: "Целевой диск",
+  title: "Target disk",
   async run({ config }): Promise<StepResult> {
     let disks: DiskInfo[];
     try {
       disks = await listDisks();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      throw new Error(`Ошибка определения дисков: ${message}`);
+      throw new Error(`Failed to list disks: ${message}`);
     }
 
-    // Носитель LiveCD и системный диск текущей ОС исключаем из выбора.
+    // The LiveCD medium and the current system disk are excluded from the choice.
     const candidates = disks.filter((disk) => !disk.isLiveMedium);
     const firmware = await detectFirmware();
-    note(`Прошивка: ${firmware === "uefi" ? "UEFI" : "BIOS"}`, "Окружение");
+    note(`Firmware: ${firmware === "uefi" ? "UEFI" : "BIOS"}`, "Environment");
 
     if (candidates.length === 0) {
-      throw new Error("Не найдено подходящих дисков (носитель LiveCD и системный диск исключены)");
+      throw new Error("No suitable disks found (LiveCD medium and current system disk excluded)");
     }
 
     const device = await select<string>({
-      message: "Целевой диск",
+      message: "Target disk",
       options: [...diskOptions(candidates), backOption()],
     });
 
@@ -111,15 +111,15 @@ export const diskStep: Step = {
     config.disk.device = device;
 
     const layout = await select<string>({
-      message: "Схема разметки",
+      message: "Partitioning scheme",
       initialValue: config.disk.layout,
       options: [
-        { value: "auto", label: "Авто", hint: "стереть диск и разметить заново" },
-        { value: "manual", label: "Ручная", hint: "свои размеры ESP/swap" },
+        { value: "auto", label: "Automatic", hint: "wipe the disk and repartition" },
+        { value: "manual", label: "Manual", hint: "custom ESP/swap sizes" },
         {
           value: "keep",
-          label: "Оставить разделы",
-          hint: "использовать существующие, без стирания",
+          label: "Keep partitions",
+          hint: "use existing partitions, no wiping",
         },
         backOption(),
       ],
@@ -127,11 +127,11 @@ export const diskStep: Step = {
 
     if (isBack(layout)) return { type: "back" };
     if (layout !== "auto" && layout !== "manual" && layout !== "keep") {
-      throw new Error(`Неизвестная схема разметки: ${layout}`);
+      throw new Error(`Unknown partitioning scheme: ${layout}`);
     }
     config.disk.layout = layout;
 
-    // Очищаем поля другой схемы при смене выбора.
+    // Clear fields of the other scheme when switching choices.
     config.disk.rootPartition = undefined;
     config.disk.rootPartitionFstype = undefined;
     config.disk.espPartition = undefined;
@@ -140,36 +140,36 @@ export const diskStep: Step = {
     if (layout === "keep") return runKeep(config, firmware);
 
     const fs = await select<string>({
-      message: "Файловая система",
+      message: "Filesystem",
       initialValue: config.disk.filesystem,
       options: [
-        { value: "btrfs", label: "btrfs", hint: "subvolumes, снапшоты, сжатие" },
-        { value: "ext4", label: "ext4", hint: "простая и проверенная" },
+        { value: "btrfs", label: "btrfs", hint: "subvolumes, snapshots, compression" },
+        { value: "ext4", label: "ext4", hint: "simple and proven" },
         backOption(),
       ],
     });
 
     if (isBack(fs)) return { type: "back" };
     if (fs !== "btrfs" && fs !== "ext4") {
-      throw new Error(`Неизвестная файловая система: ${fs}`);
+      throw new Error(`Unknown filesystem: ${fs}`);
     }
 
     config.disk.filesystem = fs;
 
     if (config.disk.filesystem === "btrfs") {
       config.disk.btrfsSubvolumes = await confirm({
-        message: "Создать subvolumes @, @home, @snapshots?",
+        message: "Create subvolumes @, @home, @snapshots?",
         initialValue: config.disk.btrfsSubvolumes,
       });
     }
 
     if (firmware === "uefi" && layout === "manual") {
       const espSize = await text({
-        message: "Размер ESP, GiB",
+        message: "ESP size, GiB",
         defaultValue: String(config.disk.espSizeGiB),
         validate: (value) => {
           const n = Number(value);
-          if (!Number.isFinite(n) || n <= 0) return "Введите положительное число";
+          if (!Number.isFinite(n) || n <= 0) return "Enter a positive number";
           return undefined;
         },
       });
@@ -177,17 +177,17 @@ export const diskStep: Step = {
     }
 
     config.disk.swap = await confirm({
-      message: "Создать swap-раздел?",
+      message: "Create a swap partition?",
       initialValue: config.disk.swap,
     });
 
     if (config.disk.swap) {
       const size = await text({
-        message: "Размер swap, GiB",
+        message: "Swap size, GiB",
         defaultValue: String(config.disk.swapSizeGiB),
         validate: (value) => {
           const n = Number(value);
-          if (!Number.isFinite(n) || n <= 0) return "Введите положительное число";
+          if (!Number.isFinite(n) || n <= 0) return "Enter a positive number";
           return undefined;
         },
       });

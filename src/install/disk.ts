@@ -12,17 +12,17 @@ import { confirm } from "../ui/prompts.ts";
 import type { InstallContext, InstallStage } from "./index.ts";
 
 const PHASE_TITLE: Record<CommandPhase, string> = {
-  partition: "Разметка",
-  format: "Форматирование",
-  mount: "Монтирование",
+  partition: "Partitioning",
+  format: "Formatting",
+  mount: "Mounting",
 };
 
-/** Разметка и форматирование уничтожают данные — это необратимая часть плана. */
+/** Partitioning and formatting destroy data — this is the irreversible part of the plan. */
 function isDestructive(commands: PlannedCommand[]): boolean {
   return commands.some((command) => command.phase === "partition" || command.phase === "format");
 }
 
-/** Печатает план команд по фазам (dry-run, ничего не выполняется). */
+/** Prints the command plan by phases (dry-run, nothing executes). */
 function printPlan(commands: PlannedCommand[]): void {
   let phase: CommandPhase | null = null;
   for (const command of commands) {
@@ -34,7 +34,7 @@ function printPlan(commands: PlannedCommand[]): void {
   }
 }
 
-/** Выполняет команды плана последовательно, напрямую (без shell). */
+/** Runs the plan commands sequentially, directly (no shell). */
 async function runCommands(commands: PlannedCommand[], label: string): Promise<void> {
   const progress = spinner();
   progress.start(label);
@@ -42,27 +42,27 @@ async function runCommands(commands: PlannedCommand[], label: string): Promise<v
     for (const command of commands) {
       await exec(command.argv);
     }
-    progress.stop("Выполнено");
+    progress.stop("Done");
   } catch (error) {
-    progress.stop("Ошибка");
+    progress.stop("Error");
     throw error;
   }
 }
 
 /**
- * Этап 4: подготовка целевого диска — таблица разделов, ФС, subvolumes,
- * монтирование в /mnt. Первая необратимая точка установки.
+ * Stage 4: preparing the target disk — partition table, FS, subvolumes,
+ * mounting into /mnt. The first irreversible point of the installation.
  */
 export const prepareDiskStage: InstallStage = {
   id: "disk",
-  title: "Подготовка диска",
+  title: "Disk preparation",
   async run(ctx: InstallContext): Promise<void> {
     const { config, interactive } = ctx;
     const device = config.disk.device;
 
-    // Идемпотентность: повторный вход поверх уже размеченного диска не стирает его.
+    // Idempotency: re-entering over an already partitioned disk does not wipe it.
     if (await isDiskPrepared(device)) {
-      log.info(`Диск ${device} уже размечен и примонтирован в /mnt — разметка пропущена.`);
+      log.info(`Disk ${device} is already partitioned and mounted in /mnt — partitioning skipped.`);
       return;
     }
 
@@ -71,22 +71,23 @@ export const prepareDiskStage: InstallStage = {
     const destructive = isDestructive(commands);
 
     if (destructive) {
-      log.warn(`Данные на диске ${device} будут стёрты.`);
+      log.warn(`Data on disk ${device} will be wiped.`);
     }
-    log.info("План команд (dry-run):");
+    log.info("Command plan (dry-run):");
     printPlan(commands);
 
     if (interactive) {
       const confirmed = await confirm({
         message: destructive
-          ? `Выполнить разметку? Данные на ${device} будут уничтожены`
-          : `Примонтировать разделы диска ${device}?`,
+          ? `Run partitioning? Data on ${device} will be destroyed`
+          : `Mount partitions of disk ${device}?`,
         initialValue: false,
       });
-      if (!confirmed) throw new CancelledError("Установка отменена: разметка не подтверждена");
+      if (!confirmed)
+        throw new CancelledError("Installation cancelled: partitioning not confirmed");
     }
 
-    await runCommands(commands, destructive ? "Разметка диска..." : "Монтирование разделов...");
-    log.success("Диск подготовлен");
+    await runCommands(commands, destructive ? "Partitioning disk..." : "Mounting partitions...");
+    log.success("Disk prepared");
   },
 };

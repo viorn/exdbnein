@@ -11,11 +11,11 @@ import { postInstallStage } from "./postinstall.ts";
 
 export interface InstallContext {
   config: InstallConfig;
-  /** Запрашивать подтверждения (интерактивный режим). */
+  /** Ask for confirmations (interactive mode). */
   interactive: boolean;
-  /** Каталог с YAML-профилями (для применения на этапе 7). */
+  /** Directory with YAML profiles (applied at stage 7). */
   profilesDir: string;
-  /** Журнал шагов фазы B (P7.2) — отчёт при ошибке и повторный вход. */
+  /** Phase B step log (P7.2) — error report and re-entry. */
   logger: InstallLogger;
 }
 
@@ -25,7 +25,7 @@ export interface InstallStage {
   run: (ctx: InstallContext) => Promise<void>;
 }
 
-/** Стадии фазы B в порядке применения. */
+/** Phase B stages in application order. */
 const STAGES: InstallStage[] = [
   prepareDiskStage,
   installBaseStage,
@@ -38,15 +38,15 @@ export interface InstallOptions {
   profilesDir: string;
 }
 
-/** Журнал пишется в целевую систему и на LiveCD-носитель (best-effort). */
+/** The log is written into the target system and onto the LiveCD medium (best-effort). */
 function installLogFiles(): string[] {
   return [`${TARGET_ROOT}/var/log/exdbnein/install.log`, "/var/log/exdbnein/install.log"];
 }
 
 /**
- * Фаза B: применяет готовый конфиг к системе. Линейный раннер без возвратов —
- * шаги визарда не используются, вопросы задаются только на подтверждение.
- * Ошибка логируется и пробрасывается; диск размонтируется всегда (finally, P7.3).
+ * Phase B: applies the ready config to the system. A linear runner without returns —
+ * wizard steps are not used, questions are only asked for confirmation.
+ * Errors are logged and rethrown; the disk is always unmounted (finally, P7.3).
  */
 export async function runInstall(config: InstallConfig, options: InstallOptions): Promise<void> {
   const ctx: InstallContext = {
@@ -61,22 +61,22 @@ export async function runInstall(config: InstallConfig, options: InstallOptions)
       ctx.logger.step(stage.id, stage.title);
       log.step(stage.title);
       await stage.run(ctx);
-      ctx.logger.ok(`стадия ${stage.id} завершена`);
+      ctx.logger.ok(`stage ${stage.id} completed`);
     }
-    // Целевой корень ещё примонтирован — журнал успевает попасть и в установленную систему.
+    // The target root is still mounted — the log also makes it into the installed system.
     await ctx.logger.flush();
     await finishInstall(ctx);
   } catch (error) {
     ctx.logger.error(error instanceof Error ? error.message : String(error));
     throw error;
   } finally {
-    // P7.3: очистка при ошибке — размонтирование и swapoff даже в unhappy-path.
+    // P7.3: cleanup on error — unmounting and swapoff even in the unhappy path.
     try {
       await unmountTarget();
       const extra = config.disk.swapPartition ? [config.disk.swapPartition] : [];
       await swapoffTarget(config.disk.device, extra);
     } catch {
-      // лог уже записан; повторная попытка — при следующем запуске (идемпотентный вход)
+      // the log is already written; retry happens on the next run (idempotent re-entry)
     }
     await ctx.logger.flush();
   }

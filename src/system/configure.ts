@@ -7,12 +7,12 @@ import { exec } from "./exec.ts";
 
 // ---- hostname ---------------------------------------------------------------
 
-/** Содержимое /etc/hostname. */
+/** Content of /etc/hostname. */
 export function hostnameFileContent(hostname: string): string {
   return `${hostname}\n`;
 }
 
-/** Содержимое /etc/hosts — localhost и статическая запись для hostname. */
+/** Content of /etc/hosts — localhost and a static entry for the hostname. */
 export function hostsFileContent(hostname: string): string {
   return [
     "127.0.0.1\tlocalhost",
@@ -26,7 +26,7 @@ export function hostsFileContent(hostname: string): string {
   ].join("\n");
 }
 
-/** hostname уже применён в целевой системе. */
+/** The hostname is already applied in the target system. */
 export async function isHostnameConfigured(hostname: string, root = TARGET_ROOT): Promise<boolean> {
   const content = await Bun.file(`${root}/etc/hostname`)
     .text()
@@ -34,13 +34,13 @@ export async function isHostnameConfigured(hostname: string, root = TARGET_ROOT)
   return content.trim() === hostname;
 }
 
-/** /etc/hostname и /etc/hosts — только если hostname ещё не установлен. */
+/** /etc/hostname and /etc/hosts — only if the hostname is not set yet. */
 export async function planHostname(config: InstallConfig): Promise<PlannedAction[]> {
   const hostname = config.network.hostname;
   if (await isHostnameConfigured(hostname)) return [];
   return [
     {
-      description: `Установить hostname ${hostname}`,
+      description: `Set hostname ${hostname}`,
       file: {
         path: `${TARGET_ROOT}/etc/hostname`,
         content: hostnameFileContent(hostname),
@@ -48,7 +48,7 @@ export async function planHostname(config: InstallConfig): Promise<PlannedAction
       },
     },
     {
-      description: "Записать /etc/hosts",
+      description: "Write /etc/hosts",
       file: {
         path: `${TARGET_ROOT}/etc/hosts`,
         content: hostsFileContent(hostname),
@@ -58,9 +58,9 @@ export async function planHostname(config: InstallConfig): Promise<PlannedAction
   ];
 }
 
-// ---- debconf-пресеты (P6.1) -------------------------------------------------
+// ---- debconf presets (P6.1) ---------------------------------------------------
 
-/** Разбивает часовой пояс на область и зону для вопросов debconf tzdata. */
+/** Splits a time zone into area and zone for the debconf tzdata questions. */
 export function tzdataAreaZone(timezone: string): [string, string] {
   const slash = timezone.indexOf("/");
   if (slash === -1) return ["Etc", timezone];
@@ -68,8 +68,8 @@ export function tzdataAreaZone(timezone: string): [string, string] {
 }
 
 /**
- * Текст debconf-пресетов для locales/console-setup/keyboard-configuration/tzdata
- * и (BIOS) grub-pc. Без них chroot-установка зависнет на вопросах (P6.1).
+ * debconf preset text for locales/console-setup/keyboard-configuration/tzdata
+ * and (BIOS) grub-pc. Without them the chroot install hangs on questions (P6.1).
  */
 export function debconfPresetsContent(config: InstallConfig, firmware: Firmware): string {
   const [area, zone] = tzdataAreaZone(config.locale.timezone);
@@ -92,7 +92,7 @@ export function debconfPresetsContent(config: InstallConfig, firmware: Firmware)
 
 const PRESEED_PATH = "/tmp/exdbnein-debconf.preseed";
 
-/** Пресеты применяются до установки пакетов; повторное применение безопасно. */
+/** Presets are applied before installing packages; re-application is safe. */
 export async function planDebconfPresets(
   config: InstallConfig,
   firmware: Firmware,
@@ -105,23 +105,23 @@ export async function planDebconfPresets(
   const content = debconfPresetsContent(config, firmware);
   return [
     {
-      description: "Записать debconf-пресеты",
+      description: "Write debconf presets",
       file: { path: `${TARGET_ROOT}${PRESEED_PATH}`, content, mode: "0600" },
     },
     {
-      description: "Применить debconf-пресеты (debconf-set-selections)",
+      description: "Apply debconf presets (debconf-set-selections)",
       argv: inChroot(["debconf-set-selections", PRESEED_PATH]),
     },
     {
-      description: "Удалить временный файл пресетов",
+      description: "Remove the temporary presets file",
       argv: ["rm", "-f", `${TARGET_ROOT}${PRESEED_PATH}`],
     },
   ];
 }
 
-// ---- системные пакеты -------------------------------------------------------
+// ---- system packages ----------------------------------------------------------
 
-/** Пакеты этапа 6 для целевой системы (зависят от сети/прошивки/загрузчика). */
+/** Stage 6 packages for the target system (depend on network/firmware/bootloader). */
 export function systemPackages(config: InstallConfig, firmware: Firmware): string[] {
   const packages = [
     "locales",
@@ -137,7 +137,7 @@ export function systemPackages(config: InstallConfig, firmware: Firmware): strin
   return packages;
 }
 
-/** Установка пропускается, если все нужные пакеты уже стоят (идемпотентность). */
+/** The installation is skipped if all needed packages are already installed (idempotency). */
 export async function planSystemPackages(
   config: InstallConfig,
   firmware: Firmware,
@@ -147,17 +147,17 @@ export async function planSystemPackages(
   if (installed.every(Boolean)) return [];
   return [
     {
-      description: `Установить системные пакеты: ${packages.join(", ")}`,
+      description: `Install system packages: ${packages.join(", ")}`,
       argv: aptGet("install", "--no-install-recommends", ...packages),
     },
   ];
 }
 
-// ---- локаль ----------------------------------------------------------------
+// ---- locale --------------------------------------------------------------------
 
-/** /etc/locale.gen: генерируется только выбранная локаль. */
+/** /etc/locale.gen: only the selected locale is generated. */
 export function localeGenContent(locale: string): string {
-  return [`# exdbnein: локали`, `${locale} UTF-8`, ""].join("\n");
+  return [`# exdbnein: locales`, `${locale} UTF-8`, ""].join("\n");
 }
 
 /** /etc/default/locale. */
@@ -165,7 +165,7 @@ export function defaultLocaleContent(locale: string): string {
   return `LANG=${locale}\n`;
 }
 
-/** Локаль уже настроена (есть /etc/default/locale с нужным LANG). */
+/** The locale is already configured (/etc/default/locale has the needed LANG). */
 export async function isLocaleConfigured(locale: string, root = TARGET_ROOT): Promise<boolean> {
   const content = await Bun.file(`${root}/etc/default/locale`)
     .text()
@@ -173,13 +173,13 @@ export async function isLocaleConfigured(locale: string, root = TARGET_ROOT): Pr
   return content.includes(`LANG=${locale}`);
 }
 
-/** Генерация локали — только если она ещё не настроена. */
+/** Locale generation — only if it is not configured yet. */
 export async function planLocale(config: InstallConfig): Promise<PlannedAction[]> {
   const locale = config.locale.locale;
   if (await isLocaleConfigured(locale)) return [];
   return [
     {
-      description: `Записать /etc/locale.gen (${locale})`,
+      description: `Write /etc/locale.gen (${locale})`,
       file: {
         path: `${TARGET_ROOT}/etc/locale.gen`,
         content: localeGenContent(locale),
@@ -187,20 +187,20 @@ export async function planLocale(config: InstallConfig): Promise<PlannedAction[]
       },
     },
     {
-      description: `Записать /etc/default/locale (${locale})`,
+      description: `Write /etc/default/locale (${locale})`,
       file: {
         path: `${TARGET_ROOT}/etc/default/locale`,
         content: defaultLocaleContent(locale),
         mode: "0644",
       },
     },
-    { description: "Сгенерировать локали (locale-gen)", argv: inChroot(["locale-gen"]) },
+    { description: "Generate locales (locale-gen)", argv: inChroot(["locale-gen"]) },
   ];
 }
 
-// ---- раскладка клавиатуры ---------------------------------------------------
+// ---- keyboard layout -----------------------------------------------------------
 
-/** /etc/default/keyboard — модель, раскладка и переключение (например, us,ru). */
+/** /etc/default/keyboard — model, layout and switching (e.g. us,ru). */
 export function keyboardContent(keymap: string): string {
   return [
     "# /etc/default/keyboard — exdbnein",
@@ -212,7 +212,7 @@ export function keyboardContent(keymap: string): string {
   ].join("\n");
 }
 
-/** Раскладка уже настроена (/etc/default/keyboard с нужным XKBLAYOUT). */
+/** The layout is already configured (/etc/default/keyboard has the needed XKBLAYOUT). */
 export async function isKeymapConfigured(keymap: string, root = TARGET_ROOT): Promise<boolean> {
   const content = await Bun.file(`${root}/etc/default/keyboard`)
     .text()
@@ -220,13 +220,13 @@ export async function isKeymapConfigured(keymap: string, root = TARGET_ROOT): Pr
   return content.includes(`XKBLAYOUT="${keymap}"`);
 }
 
-/** Раскладка консоли и X11 — через /etc/default/keyboard (console-setup). */
+/** Console and X11 layout — via /etc/default/keyboard (console-setup). */
 export async function planKeyboard(config: InstallConfig): Promise<PlannedAction[]> {
   const keymap = config.locale.keymap;
   if (await isKeymapConfigured(keymap)) return [];
   return [
     {
-      description: `Записать /etc/default/keyboard (${keymap})`,
+      description: `Write /etc/default/keyboard (${keymap})`,
       file: {
         path: `${TARGET_ROOT}/etc/default/keyboard`,
         content: keyboardContent(keymap),
@@ -236,65 +236,65 @@ export async function planKeyboard(config: InstallConfig): Promise<PlannedAction
   ];
 }
 
-// ---- часовой пояс -----------------------------------------------------------
+// ---- time zone ------------------------------------------------------------------
 
-/** Путь к файлу зоны внутри целевой системы. */
+/** Path to the zone file inside the target system. */
 export function timezonePath(timezone: string): string {
   return `/usr/share/zoneinfo/${timezone}`;
 }
 
-/** Часовой пояс уже настроен (симлинк /etc/localtime). */
+/** The time zone is already configured (symlink /etc/localtime). */
 export async function isTimezoneConfigured(timezone: string, root = TARGET_ROOT): Promise<boolean> {
   const target = await readlink(`${root}/etc/localtime`).catch(() => "");
   return target === timezonePath(timezone);
 }
 
-/** /etc/timezone + симлинк /etc/localtime на tzdata-зону. */
+/** /etc/timezone + /etc/localtime symlink to the tzdata zone. */
 export async function planTimezone(config: InstallConfig): Promise<PlannedAction[]> {
   const timezone = config.locale.timezone;
   if (await isTimezoneConfigured(timezone)) return [];
   return [
     {
-      description: `Записать /etc/timezone (${timezone})`,
+      description: `Write /etc/timezone (${timezone})`,
       file: { path: `${TARGET_ROOT}/etc/timezone`, content: `${timezone}\n`, mode: "0644" },
     },
     {
-      description: `Связать /etc/localtime с ${timezone}`,
+      description: `Link /etc/localtime to ${timezone}`,
       argv: ["ln", "-sf", timezonePath(timezone), `${TARGET_ROOT}/etc/localtime`],
     },
   ];
 }
 
-// ---- пароль root ------------------------------------------------------------
+// ---- root password --------------------------------------------------------------
 
-/** Хеш пароля root в целевой системе (из /etc/shadow); null — если не задан. */
+/** Root password hash in the target system (from /etc/shadow); null — if unset. */
 export async function rootPasswordHashInSystem(root = TARGET_ROOT): Promise<string | null> {
   const result = await exec(inChroot(["getent", "shadow", "root"], root), { allowFailure: true });
   if (result.code !== 0) return null;
   return result.stdout.split(":")[1] ?? null;
 }
 
-/** Пароль root — только если хеш отличается от текущего (идемпотентность). */
+/** Root password — only if the hash differs from the current one (idempotency). */
 export async function planRootPassword(config: InstallConfig): Promise<PlannedAction[]> {
   const hash = config.rootPasswordHash;
   if (!hash || (await rootPasswordHashInSystem()) === hash) return [];
   return [
     {
-      description: "Установить пароль root",
+      description: "Set root password",
       argv: inChroot(["usermod", "-p", hash, "root"]),
     },
   ];
 }
 
-// ---- пользователи и SSH-ключи (P6.3) ----------------------------------------
+// ---- users and SSH keys (P6.3) --------------------------------------------------
 
-/** Пользователь уже существует в целевой системе. */
+/** The user already exists in the target system. */
 export async function isUserCreated(username: string, root = TARGET_ROOT): Promise<boolean> {
   const result = await exec(inChroot(["id", "-u", username], root), { allowFailure: true });
   return result.code === 0;
 }
 
-/** Команда useradd: home, bash, sudo-группа, полное имя, хеш пароля. */
+/** useradd command: home, bash, sudo group, full name, password hash. */
 export function useraddCommand(user: UserConfig): string[] {
   const args = ["useradd", "-m", "-s", "/bin/bash"];
   if (user.sudo) args.push("-G", "sudo");
@@ -303,7 +303,7 @@ export function useraddCommand(user: UserConfig): string[] {
   return inChroot(args);
 }
 
-/** Содержимое authorized_keys — по ключу на строку. */
+/** authorized_keys content — one key per line. */
 export function authorizedKeysContent(keys: string[]): string {
   return `${keys
     .map((key) => key.trim())
@@ -311,7 +311,7 @@ export function authorizedKeysContent(keys: string[]): string {
     .join("\n")}\n`;
 }
 
-/** SSH-ключи: ~/.ssh 700, authorized_keys 600, владелец — пользователь (P6.3). */
+/** SSH keys: ~/.ssh 700, authorized_keys 600, owner — the user (P6.3). */
 export async function planUserSsh(user: UserConfig): Promise<PlannedAction[]> {
   if (user.sshKeys.length === 0) return [];
   const home = `/home/${user.username}`;
@@ -323,25 +323,28 @@ export async function planUserSsh(user: UserConfig): Promise<PlannedAction[]> {
   if (current === keys) return [];
   return [
     {
-      description: `Записать ${sshDir}/authorized_keys`,
+      description: `Write ${sshDir}/authorized_keys`,
       file: { path: `${TARGET_ROOT}${sshDir}/authorized_keys`, content: keys, mode: "0600" },
     },
-    { description: `Права 700 на ${sshDir}`, argv: ["chmod", "700", `${TARGET_ROOT}${sshDir}`] },
     {
-      description: `Владелец ${home} — ${user.username}`,
+      description: `Set 700 permissions on ${sshDir}`,
+      argv: ["chmod", "700", `${TARGET_ROOT}${sshDir}`],
+    },
+    {
+      description: `Owner of ${home} — ${user.username}`,
       argv: ["chown", "-R", `${user.username}:${user.username}`, `${TARGET_ROOT}${home}`],
     },
   ];
 }
 
-/** Создание пользователей и их SSH-ключей. */
+/** Creating users and their SSH keys. */
 export async function planUsers(config: InstallConfig): Promise<PlannedAction[]> {
   const actions: PlannedAction[] = [];
   for (const user of config.users) {
     if (!user.passwordHash) continue;
     if (!(await isUserCreated(user.username))) {
       actions.push({
-        description: `Создать пользователя ${user.username}`,
+        description: `Create user ${user.username}`,
         argv: useraddCommand(user),
       });
     }
@@ -350,12 +353,12 @@ export async function planUsers(config: InstallConfig): Promise<PlannedAction[]>
   return actions;
 }
 
-// ---- сеть -------------------------------------------------------------------
+// ---- network ----------------------------------------------------------------------
 
-/** DHCP-конфиг systemd-networkd для проводных интерфейсов. */
+/** systemd-networkd DHCP config for wired interfaces. */
 export function networkdDhcpContent(): string {
   return [
-    "# exdbnein: DHCP на проводных интерфейсах",
+    "# exdbnein: DHCP on wired interfaces",
     "[Match]",
     "Name=en* eth*",
     "",
@@ -366,7 +369,7 @@ export function networkdDhcpContent(): string {
   ].join("\n");
 }
 
-/** Сервис включён в целевой системе (systemctl is-enabled). */
+/** The service is enabled in the target system (systemctl is-enabled). */
 export async function isServiceEnabled(unit: string, root = TARGET_ROOT): Promise<boolean> {
   const result = await exec(inChroot(["systemctl", "is-enabled", unit], root), {
     allowFailure: true,
@@ -374,14 +377,14 @@ export async function isServiceEnabled(unit: string, root = TARGET_ROOT): Promis
   return result.code === 0;
 }
 
-/** Сеть: NetworkManager, systemd-networkd + resolved, либо ничего (manager=none). */
+/** Network: NetworkManager, systemd-networkd + resolved, or nothing (manager=none). */
 export async function planNetwork(config: InstallConfig): Promise<PlannedAction[]> {
   const actions: PlannedAction[] = [];
 
   if (config.network.manager === "networkmanager") {
     if (!(await isServiceEnabled("NetworkManager"))) {
       actions.push({
-        description: "Включить NetworkManager (systemctl enable)",
+        description: "Enable NetworkManager (systemctl enable)",
         argv: inChroot(["systemctl", "enable", "NetworkManager"]),
       });
     }
@@ -392,14 +395,14 @@ export async function planNetwork(config: InstallConfig): Promise<PlannedAction[
     const netFile = `${TARGET_ROOT}/etc/systemd/network/20-wired.network`;
     if (!(await Bun.file(netFile).exists())) {
       actions.push({
-        description: "Записать DHCP-конфиг systemd-networkd",
+        description: "Write systemd-networkd DHCP config",
         file: { path: netFile, content: networkdDhcpContent(), mode: "0644" },
       });
     }
     for (const unit of ["systemd-networkd", "systemd-resolved"]) {
       if (!(await isServiceEnabled(unit))) {
         actions.push({
-          description: `Включить ${unit}`,
+          description: `Enable ${unit}`,
           argv: inChroot(["systemctl", "enable", unit]),
         });
       }
@@ -407,7 +410,7 @@ export async function planNetwork(config: InstallConfig): Promise<PlannedAction[
     const resolvLink = `${TARGET_ROOT}/etc/resolv.conf`;
     if ((await readlink(resolvLink).catch(() => "")) !== "/run/systemd/resolve/resolv.conf") {
       actions.push({
-        description: "Перенаправить /etc/resolv.conf на systemd-resolved",
+        description: "Point /etc/resolv.conf to systemd-resolved",
         argv: ["ln", "-sf", "/run/systemd/resolve/resolv.conf", resolvLink],
       });
     }
@@ -416,14 +419,14 @@ export async function planNetwork(config: InstallConfig): Promise<PlannedAction[
   return actions;
 }
 
-// ---- загрузчик --------------------------------------------------------------
+// ---- bootloader -------------------------------------------------------------------
 
-/** Пакет GRUB по прошивке. */
+/** GRUB package by firmware. */
 export function grubPackage(firmware: Firmware): string {
   return firmware === "uefi" ? "grub-efi-amd64" : "grub-pc";
 }
 
-/** /etc/default/grub: os-prober выключен по умолчанию (P6.2). */
+/** /etc/default/grub: os-prober disabled by default (P6.2). */
 export function grubDefaultsContent(osProber: boolean): string {
   return [
     "# /etc/default/grub — exdbnein",
@@ -437,7 +440,7 @@ export function grubDefaultsContent(osProber: boolean): string {
   ].join("\n");
 }
 
-/** Команда grub-install: BIOS — в устройство, UEFI — в ESP с efi-directory. */
+/** grub-install command: BIOS — into the device, UEFI — into ESP with efi-directory. */
 export function grubInstallCommand(firmware: Firmware, device: string): string[] {
   if (firmware === "uefi") {
     return inChroot([
@@ -452,8 +455,8 @@ export function grubInstallCommand(firmware: Firmware, device: string): string[]
 }
 
 /**
- * GRUB установлен: для UEFI — файл загрузчика в ESP, для BIOS — сгенерированный
- * grub.cfg (после postinst grub-pc с пресетом install_devices).
+ * GRUB is installed: for UEFI — the bootloader file in ESP, for BIOS — the generated
+ * grub.cfg (after the grub-pc postinst with the install_devices preset).
  */
 export async function isGrubInstalled(firmware: Firmware, root = TARGET_ROOT): Promise<boolean> {
   const version = await exec(inChroot(["grub-install", "--version"], root), { allowFailure: true });
@@ -464,7 +467,7 @@ export async function isGrubInstalled(firmware: Firmware, root = TARGET_ROOT): P
   return Bun.file(`${root}/boot/grub/grub.cfg`).exists();
 }
 
-/** Загрузчик: /etc/default/grub, grub-install, update-grub, fallback-копия для UEFI. */
+/** Bootloader: /etc/default/grub, grub-install, update-grub, UEFI fallback copy. */
 export async function planBootloader(
   config: InstallConfig,
   firmware: Firmware,
@@ -479,16 +482,16 @@ export async function planBootloader(
 
   if (defaultsChanged) {
     actions.push({
-      description: "Записать /etc/default/grub",
+      description: "Write /etc/default/grub",
       file: { path: defaultsPath, content: desired, mode: "0644" },
     });
   }
 
   if (await isGrubInstalled(firmware)) {
-    // Пакет уже поставил GRUB; пересборка нужна только при изменении настроек.
+    // The package already installed GRUB; rebuild is needed only when settings changed.
     if (defaultsChanged) {
       actions.push({
-        description: "Пересобрать конфигурацию GRUB (update-grub)",
+        description: "Rebuild GRUB configuration (update-grub)",
         argv: inChroot(["update-grub"]),
       });
     }
@@ -496,18 +499,18 @@ export async function planBootloader(
   }
 
   actions.push({
-    description: `Установить GRUB (${firmware === "uefi" ? "UEFI" : "BIOS"})`,
+    description: `Install GRUB (${firmware === "uefi" ? "UEFI" : "BIOS"})`,
     argv: grubInstallCommand(firmware, config.disk.device),
   });
   if (firmware === "uefi") {
-    // Резервный путь загрузки — работает в QEMU/OVMF даже без записи в NVRAM.
+    // Fallback boot path — works in QEMU/OVMF even without NVRAM entries.
     actions.push(
       {
-        description: "Создать каталог резервного EFI-загрузчика",
+        description: "Create fallback EFI bootloader directory",
         argv: ["mkdir", "-p", `${TARGET_ROOT}/boot/efi/EFI/BOOT`],
       },
       {
-        description: "Скопировать grubx64.efi в EFI/BOOT (fallback)",
+        description: "Copy grubx64.efi to EFI/BOOT (fallback)",
         argv: [
           "cp",
           `${TARGET_ROOT}/boot/efi/EFI/exdbnein/grubx64.efi`,
@@ -517,7 +520,7 @@ export async function planBootloader(
     );
   }
   actions.push({
-    description: "Обновить конфигурацию GRUB (update-grub)",
+    description: "Update GRUB configuration (update-grub)",
     argv: inChroot(["update-grub"]),
   });
   return actions;

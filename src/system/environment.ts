@@ -3,26 +3,26 @@ import { shell } from "./exec.ts";
 
 export type Firmware = "uefi" | "bios";
 
-/** Маркер Live-окружения; создаётся сборкой LiveCD (этап 8). */
+/** Live-environment marker; created by the LiveCD build (stage 8). */
 export const LIVE_MARKER = "/etc/exdbnein-live";
 
-/** Установщик запущен от root. */
+/** The installer is running as root. */
 export async function isRoot(): Promise<boolean> {
   const result = await shell("id -u", { allowFailure: true });
   return result.code === 0 && result.stdout.trim() === "0";
 }
 
-/** Есть маркер LiveCD. */
+/** The LiveCD marker is present. */
 export async function isLiveEnvironment(): Promise<boolean> {
   return Bun.file(LIVE_MARKER).exists();
 }
 
-/** Определение прошивки: UEFI при наличии /sys/firmware/efi. */
+/** Firmware detection: UEFI when /sys/firmware/efi exists. */
 export async function detectFirmware(): Promise<Firmware> {
   return (await Bun.file("/sys/firmware/efi").exists()) ? "uefi" : "bios";
 }
 
-/** Число активных сетевых интерфейсов, кроме loopback. */
+/** Number of active network interfaces, excluding loopback. */
 export async function networkInterfaceCount(): Promise<number> {
   try {
     const entries = await readdir("/sys/class/net");
@@ -32,7 +32,7 @@ export async function networkInterfaceCount(): Promise<number> {
   }
 }
 
-/** Проверяет доступность зеркала HEAD-запросом за конечное время. */
+/** Checks mirror availability with a HEAD request within a finite time. */
 export async function checkNetwork(mirror: string, timeoutMs = 8000): Promise<boolean> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);

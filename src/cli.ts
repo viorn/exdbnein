@@ -1,28 +1,28 @@
 export interface CliOptions {
-  /** Путь к файлу конфигурации для загрузки/сохранения. */
+  /** Path to the config file for loading/saving. */
   config?: string;
-  /** Каталог с YAML-профилями. */
+  /** Directory with YAML profiles. */
   profilesDir: string;
-  /** Авторежим без вопросов. */
+  /** Unattended mode without questions. */
   unattended: boolean;
-  /** Разрешить запуск вне LiveCD (для разработки). */
+  /** Allow running outside the LiveCD (for development). */
   force: boolean;
   help: boolean;
 }
 
 const DEFAULT_PROFILES_DIR = "profiles";
 
-const HELP = `exdbnein — консольный установщик Debian
+const HELP = `exdbnein — console Debian installer
 
-Использование:
-  exdbnein [опции]
+Usage:
+  exdbnein [options]
 
-Опции:
-  -c, --config <file>       Загрузить/сохранить конфигурацию в JSON
-  -p, --profiles-dir <dir>  Каталог с YAML-профилями (по умолчанию: ${DEFAULT_PROFILES_DIR})
-  -y, --unattended          Авторежим: без вопросов, использовать загруженный конфиг
-  -f, --force               Разрешить запуск вне LiveCD (для разработки)
-  -h, --help                Показать эту справку
+Options:
+  -c, --config <file>       Load/save the configuration as JSON
+  -p, --profiles-dir <dir>  Directory with YAML profiles (default: ${DEFAULT_PROFILES_DIR})
+  -y, --unattended          Unattended mode: no questions, use the loaded config
+  -f, --force               Allow running outside the LiveCD (for development)
+  -h, --help                Show this help
 `;
 
 export function parseArgs(argv: string[]): CliOptions {
@@ -57,7 +57,7 @@ export function parseArgs(argv: string[]): CliOptions {
         options.help = true;
         break;
       default:
-        throw new Error(`Неизвестный аргумент: ${arg}`);
+        throw new Error(`Unknown argument: ${arg}`);
     }
   }
 

@@ -4,12 +4,12 @@ import { exec } from "./exec.ts";
 import { parseSwaps } from "./fstab.ts";
 
 /**
- * Финализация установки (P7.3): корректное размонтирование /mnt, отключение swap
- * целевого диска и перезагрузка. Все операции идемпотентны и не бросают исключений —
- * вызываются из finally-блоков даже при ошибке установки.
+ * Installation finalization (P7.3): proper unmounting of /mnt, disabling the target
+ * disk swap and rebooting. All operations are idempotent and do not throw —
+ * they are called from finally blocks even on installation errors.
  */
 
-/** Читает активные swap-устройства из /proc/swaps. */
+/** Reads active swap devices from /proc/swaps. */
 export async function readSwaps(): Promise<string[]> {
   try {
     return parseSwaps(await readFile("/proc/swaps", "utf8"));
@@ -19,8 +19,8 @@ export async function readSwaps(): Promise<string[]> {
 }
 
 /**
- * Swap-устройства целевой системы: явный список (схема keep) плюс все разделы
- * целевого диска по префиксу пути (схемы auto/manual). Swap LiveCD при этом не трогается.
+ * Target system swap devices: the explicit list (keep layout) plus all partitions
+ * of the target disk by path prefix (auto/manual layouts). The LiveCD swap is untouched.
  */
 export function swapsForTarget(swaps: string[], device: string, extra: string[] = []): string[] {
   const wanted = new Set<string>(extra.filter(Boolean));
@@ -30,7 +30,7 @@ export function swapsForTarget(swaps: string[], device: string, extra: string[] 
   return [...wanted];
 }
 
-/** Отключает подкачку целевой системы; утилизирует только свои разделы. */
+/** Disables the target system swap; only touches its own partitions. */
 export async function swapoffTarget(device: string, extra: string[] = []): Promise<void> {
   for (const swap of swapsForTarget(await readSwaps(), device, extra)) {
     await exec(["swapoff", swap], { allowFailure: true });
@@ -38,9 +38,9 @@ export async function swapoffTarget(device: string, extra: string[] = []): Promi
 }
 
 /**
- * Порядок размонтирования: вложенные точки раньше корня /mnt (последний элемент).
- * Совпадает с монтированиями этапа 4 (ESP, @home, @snapshots) и chroot-монтированиями
- * этапа 5 (/proc /sys /dev /dev/pts /run + efivars внутри /sys).
+ * Unmount order: nested mount points before the root /mnt (the last element).
+ * Matches stage 4 mounts (ESP, @home, @snapshots) and stage 5 chroot mounts
+ * (/proc /sys /dev /dev/pts /run + efivars inside /sys).
  */
 export const UNMOUNT_ORDER = [
   "/boot/efi",
@@ -55,8 +55,8 @@ export const UNMOUNT_ORDER = [
 ];
 
 /**
- * Размонтирует целевую систему. Каждая точка проверяется через findmnt —
- * повторный вызов после ошибки безопасен и ничего не ломает.
+ * Unmounts the target system. Every mount point is checked via findmnt —
+ * calling again after an error is safe and breaks nothing.
  */
 export async function unmountTarget(root = TARGET_ROOT): Promise<void> {
   for (const suffix of UNMOUNT_ORDER) {
@@ -67,7 +67,7 @@ export async function unmountTarget(root = TARGET_ROOT): Promise<void> {
   }
 }
 
-/** Перезагружает систему (по подтверждению пользователя). */
+/** Reboots the system (after user confirmation). */
 export async function rebootNow(): Promise<void> {
   await exec(["reboot"]);
 }

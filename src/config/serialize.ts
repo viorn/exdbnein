@@ -1,6 +1,6 @@
 import { CONFIG_VERSION, defaultConfig, type InstallConfig } from "./types.ts";
 
-/** Убирает из конфига секреты (пароли в открытом виде) перед записью на диск. */
+/** Removes secrets (plaintext passwords) from the config before writing to disk. */
 export function redact(config: InstallConfig): InstallConfig {
   return {
     ...config,
@@ -12,7 +12,7 @@ export function serializeConfig(config: InstallConfig): string {
   return `${JSON.stringify(redact(config), null, 2)}\n`;
 }
 
-/** Разбирает JSON и дополняет недостающие поля значениями по умолчанию. */
+/** Parses JSON and fills missing fields with defaults. */
 export function parseConfig(json: string): InstallConfig {
   const raw = JSON.parse(json) as Partial<InstallConfig>;
   const base = defaultConfig();
@@ -36,7 +36,7 @@ export async function saveConfig(config: InstallConfig, path: string): Promise<v
 export async function loadConfig(path: string): Promise<InstallConfig> {
   const file = Bun.file(path);
   if (!(await file.exists())) {
-    throw new Error(`Файл конфигурации не найден: ${path}`);
+    throw new Error(`Configuration file not found: ${path}`);
   }
   return parseConfig(await file.text());
 }

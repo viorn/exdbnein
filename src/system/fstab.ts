@@ -1,7 +1,7 @@
 import { TARGET_ROOT } from "./chroot.ts";
 import { exec } from "./exec.ts";
 
-/** Колонки findmnt, нужные генератору fstab. */
+/** findmnt columns needed by the fstab generator. */
 const FINDMNT_COLUMNS = "SOURCE,TARGET,FSTYPE,OPTIONS,UUID";
 
 export interface FindmntEntry {
@@ -13,9 +13,9 @@ export interface FindmntEntry {
 }
 
 export interface FstabEntry {
-  /** Источник в формате fstab, например UUID=... */
+  /** Source in fstab format, e.g. UUID=... */
   source: string;
-  /** Точка монтирования в целевой системе: /, /home, none (swap). */
+  /** Mount point in the target system: /, /home, none (swap). */
   mountpoint: string;
   fstype: string;
   options: string;
@@ -23,23 +23,23 @@ export interface FstabEntry {
   pass: number;
 }
 
-/** Настоящие ФС — попадают в fstab; псевдо-ФС монтируются системой автоматически. */
+/** Real filesystems — go into fstab; pseudo-FS are mounted by the system automatically. */
 export const REAL_FILESYSTEMS = new Set(["btrfs", "ext4", "vfat", "xfs", "f2fs", "exfat", "ntfs"]);
 
-/** Разбирает вывод `findmnt -J`. */
+/** Parses `findmnt -J` output. */
 export function parseFindmnt(json: string): FindmntEntry[] {
   const parsed = JSON.parse(json) as { filesystems?: FindmntEntry[] };
   return (parsed.filesystems ?? []).filter((entry) => typeof entry.target === "string");
 }
 
-/** Преобразует точку монтирования внутри целевого корня в путь целевой системы. */
+/** Converts a mount point inside the target root into a target system path. */
 export function targetToMountpoint(target: string, root = TARGET_ROOT): string {
   if (target === root) return "/";
   if (target.startsWith(`${root}/`)) return target.slice(root.length);
   return target;
 }
 
-/** Реальные ФС, смонтированные внутри целевого корня. */
+/** Real filesystems mounted inside the target root. */
 export function realEntries(entries: FindmntEntry[], root = TARGET_ROOT): FindmntEntry[] {
   return entries.filter(
     (entry) =>
@@ -48,15 +48,15 @@ export function realEntries(entries: FindmntEntry[], root = TARGET_ROOT): Findmn
   );
 }
 
-/** Извлекает опцию subvol= из строки монтирования (btrfs). */
+/** Extracts the subvol= option from a mount options string (btrfs). */
 export function subvolOption(options: string): string | null {
   const match = /(?:^|,)(subvol=[^,]+)/.exec(options);
   return match?.[1] ?? null;
 }
 
 /**
- * Опции fstab по типу ФС (соответствуют решениям этапов 4–5):
- * btrfs — compress=zstd,noatime (+subvol), vfat — umask=0077, остальные — rw,relatime.
+ * fstab options by filesystem type (matching stage 4–5 decisions):
+ * btrfs — compress=zstd,noatime (+subvol), vfat — umask=0077, others — rw,relatime.
  */
 export function fstabOptions(entry: FindmntEntry): string {
   if (entry.fstype === "vfat") return "defaults,umask=0077";
@@ -67,7 +67,7 @@ export function fstabOptions(entry: FindmntEntry): string {
   return "rw,relatime";
 }
 
-/** Поля dump/pass по типу ФС и точке монтирования. */
+/** dump/pass fields by filesystem type and mount point. */
 export function fstabDumpPass(fstype: string, mountpoint: string): [number, number] {
   if (fstype === "btrfs" || fstype === "xfs" || fstype === "f2fs") return [0, 0];
   if (mountpoint === "/") return [0, 1];
@@ -76,19 +76,19 @@ export function fstabDumpPass(fstype: string, mountpoint: string): [number, numb
   return [0, 0];
 }
 
-/** Одна строка fstab. */
+/** A single fstab line. */
 export function formatFstabEntry(entry: FstabEntry): string {
   return [entry.source, entry.mountpoint, entry.fstype, entry.options, entry.dump, entry.pass].join(
     "\t",
   );
 }
 
-/** Все строки fstab. */
+/** All fstab lines. */
 export function formatFstab(entries: FstabEntry[]): string {
   return entries.map(formatFstabEntry).join("\n");
 }
 
-/** Разбирает /proc/swaps в список устройств подкачки. */
+/** Parses /proc/swaps into a list of swap devices. */
 export function parseSwaps(text: string): string[] {
   return text
     .split("\n")
@@ -97,7 +97,7 @@ export function parseSwaps(text: string): string[] {
     .filter((device) => device.startsWith("/dev/"));
 }
 
-/** Разбирает `blkid -o export`: пары DEVNAME=.../UUID=... в карту устройство → UUID. */
+/** Parses `blkid -o export`: DEVNAME=.../UUID=... pairs into a device → UUID map. */
 export function parseBlkidExport(text: string): Map<string, string> {
   const uuidByDevice = new Map<string, string>();
   let device = "";
@@ -114,9 +114,9 @@ export function parseBlkidExport(text: string): Map<string, string> {
 }
 
 /**
- * Собирает fstab из фактического состояния (P5.2): примонтированные в целевом
- * корне реальные ФС из findmnt + swap из /proc/swaps, UUID берутся из blkid.
- * Записи по UUID, а не по /dev/sdX — имена устройств меняются между перезагрузками.
+ * Builds fstab from the actual state (P5.2): real FS mounted in the target
+ * root from findmnt + swap from /proc/swaps, UUIDs taken from blkid.
+ * Entries by UUID, not by /dev/sdX — device names change between reboots.
  */
 export function buildFstab(
   findmntJson: string,
@@ -157,7 +157,7 @@ export function buildFstab(
   return formatFstab(entries);
 }
 
-/** Генерирует fstab по фактически примонтированному целевому корню. */
+/** Generates fstab from the actually mounted target root. */
 export async function generateFstab(root = TARGET_ROOT): Promise<string> {
   const findmnt = await exec(["findmnt", "-R", "-J", "-o", FINDMNT_COLUMNS, root]);
   const swaps = await Bun.file("/proc/swaps").text();

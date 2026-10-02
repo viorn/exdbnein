@@ -2,22 +2,22 @@ import type { DiskConfig, Filesystem, InstallConfig } from "../config/types.ts";
 import type { Firmware } from "./environment.ts";
 import { exec } from "./exec.ts";
 
-/** Информация о диске из lsblk. */
+/** Disk information from lsblk. */
 export interface DiskInfo {
-  /** Имя устройства, например sda. */
+  /** Device name, e.g. sda. */
   name: string;
-  /** Путь к устройству, например /dev/sda. */
+  /** Device path, e.g. /dev/sda. */
   path: string;
-  /** Размер в человекочитаемом виде, например 238.5G. */
+  /** Human-readable size, e.g. 238.5G. */
   size: string;
-  /** Тип устройства (disk/part/...). */
+  /** Device type (disk/part/...). */
   type: string;
-  /** Съёмный носитель. */
+  /** Removable medium. */
   removable: boolean;
-  /** Транспорт: usb/sata/nvme/... */
+  /** Transport: usb/sata/nvme/... */
   tran?: string;
   model?: string;
-  /** Диск является носителем LiveCD (или системным диском текущей ОС). */
+  /** The disk is the LiveCD medium (or the current OS system disk). */
   isLiveMedium: boolean;
 }
 
@@ -46,7 +46,7 @@ const LSBLK_COLUMNS = [
   "MOUNTPOINTS",
 ];
 
-/** Разбирает вывод `lsblk -J` в список дисков (только type=disk). */
+/** Parses `lsblk -J` output into a list of disks (only type=disk). */
 export function parseLsblkOutput(json: string): DiskInfo[] {
   const parsed = JSON.parse(json) as { blockdevices?: LsblkNode[] };
   return (parsed.blockdevices ?? []).filter((node) => node.type === "disk").map(toDiskInfo);
@@ -66,9 +66,9 @@ function toDiskInfo(node: LsblkNode): DiskInfo {
 }
 
 /**
- * Носитель LiveCD — диск, где примонтированы корень системы («/»),
- * live-разделы (/run/live*), CD (/cdrom) или съёмные медиа (/media/*).
- * Такие диски нельзя выбирать целью установки.
+ * The LiveCD medium — a disk where the system root ("/"),
+ * live partitions (/run/live*), CD (/cdrom) or removable media (/media/*) are mounted.
+ * Such disks cannot be selected as the installation target.
  */
 function hasLiveMountpoint(node: LsblkNode): boolean {
   const mounts = collectMountpoints(node);
@@ -89,60 +89,60 @@ function collectMountpoints(node: LsblkNode): string[] {
   return [...own, ...children];
 }
 
-/** Возвращает путь к разделу index диска (суффикс p для NVMe/MMC и т.п.). */
+/** Returns the path to the disk partition `index` (p suffix for NVMe/MMC etc.). */
 export function partitionPath(diskPath: string, index: number): string {
   return /[0-9]$/.test(diskPath) ? `${diskPath}p${index}` : `${diskPath}${index}`;
 }
 
-/** Получает список дисков через `lsblk -J`. */
+/** Fetches the disk list via `lsblk -J`. */
 export async function listDisks(): Promise<DiskInfo[]> {
   const result = await exec(["lsblk", "-J", "-o", LSBLK_COLUMNS.join(",")], {
     allowFailure: true,
   });
   if (result.code !== 0) {
-    throw new Error(`Не удалось получить список дисков: ${result.stderr.trim()}`);
+    throw new Error(`Failed to list disks: ${result.stderr.trim()}`);
   }
   return parseLsblkOutput(result.stdout);
 }
 
-// ---- Этап 4: разметка диска ------------------------------------------------
+// ---- Stage 4: disk partitioning ----------------------------------------------
 
 export type PartitionTable = "gpt" | "msdos";
 export type PartitionKind = "esp" | "root" | "swap";
 export type CommandPhase = "partition" | "format" | "mount";
 
-/** Раздел в генерируемой раскладке (схемы auto/manual). */
+/** Partition in the generated layout (auto/manual schemes). */
 export interface PartitionSpec {
-  /** Номер раздела (1-based). */
+  /** Partition number (1-based). */
   number: number;
   kind: PartitionKind;
-  /** Размер в GiB; отсутствует — раздел занимает остаток диска. */
+  /** Size in GiB; absent — the partition takes the rest of the disk. */
   sizeGiB?: number;
   filesystem: Filesystem | "fat32" | "swap";
-  /** Точка монтирования в целевой системе. */
+  /** Mount point in the target system. */
   mountpoint?: string;
-  /** Флаг раздела (GPT: esp; MBR: boot). */
+  /** Partition flag (GPT: esp; MBR: boot). */
   bootFlag?: "esp" | "boot";
-  /** Создавать subvolumes btrfs (@, @home, @snapshots). */
+  /** Create btrfs subvolumes (@, @home, @snapshots). */
   btrfsSubvolumes?: boolean;
 }
 
-/** Раскладка разделов для схем auto/manual. */
+/** Partition layout for the auto/manual schemes. */
 export interface PartitionLayout {
   table: PartitionTable;
   partitions: PartitionSpec[];
 }
 
-/** Команда плана: показывается в dry-run и исполняется напрямую (без shell). */
+/** Plan command: shown in dry-run and executed directly (no shell). */
 export interface PlannedCommand {
   phase: CommandPhase;
-  /** Человекочитаемое описание. */
+  /** Human-readable description. */
   description: string;
-  /** Аргументы команды. */
+  /** Command arguments. */
   argv: string[];
 }
 
-/** Информация о разделе диска из lsblk. */
+/** Partition information from lsblk. */
 export interface PartitionInfo {
   name: string;
   path: string;
@@ -165,8 +165,8 @@ const KIND_LABEL: Record<PartitionKind, string> = {
 };
 
 /**
- * Строит раскладку по схемам auto/manual: UEFI → GPT + ESP + root (+swap),
- * BIOS → MBR + root (+swap). Раздел root — последний, занимает остаток диска.
+ * Builds the layout for auto/manual schemes: UEFI → GPT + ESP + root (+swap),
+ * BIOS → MBR + root (+swap). The root partition is last and takes the rest of the disk.
  */
 export function buildPartitionLayout(disk: DiskConfig, firmware: Firmware): PartitionLayout {
   const partitions: PartitionSpec[] = [];
@@ -204,7 +204,7 @@ export function buildPartitionLayout(disk: DiskConfig, firmware: Firmware): Part
   return { table: firmware === "uefi" ? "gpt" : "msdos", partitions };
 }
 
-/** Разбирает вывод `lsblk -J <disk>` в список разделов диска. */
+/** Parses `lsblk -J <disk>` output into a list of disk partitions. */
 export function parseLsblkPartitions(json: string): PartitionInfo[] {
   const parsed = JSON.parse(json) as { blockdevices?: LsblkNode[] };
   const diskNode = parsed.blockdevices?.[0];
@@ -221,31 +221,31 @@ export function parseLsblkPartitions(json: string): PartitionInfo[] {
     }));
 }
 
-/** Получает разделы диска через `lsblk -J <device>`. */
+/** Fetches the partitions of a disk via `lsblk -J <device>`. */
 export async function listPartitions(device: string): Promise<PartitionInfo[]> {
   const result = await exec(["lsblk", "-J", "-o", LSBLK_COLUMNS.join(","), device], {
     allowFailure: true,
   });
   if (result.code !== 0) {
-    throw new Error(`Не удалось получить разделы диска ${device}: ${result.stderr.trim()}`);
+    throw new Error(`Failed to list partitions of ${device}: ${result.stderr.trim()}`);
   }
   return parseLsblkPartitions(result.stdout);
 }
 
-/** Диск уже подготовлен, если какой-то его раздел примонтирован в /mnt. */
+/** The disk is already prepared if any of its partitions is mounted in /mnt. */
 export async function isDiskPrepared(device: string): Promise<boolean> {
   const partitions = await listPartitions(device);
   return partitions.some((partition) => partition.mountpoints.includes("/mnt"));
 }
 
-/** Команды разметки, форматирования и монтирования для раскладки. */
+/** Partitioning, formatting and mounting commands for a layout. */
 export function layoutCommands(device: string, layout: PartitionLayout): PlannedCommand[] {
   const commands: PlannedCommand[] = [];
   const part = (number: number) => partitionPath(device, number);
 
   commands.push({
     phase: "partition",
-    description: `Создать таблицу разделов ${layout.table === "gpt" ? "GPT" : "MBR"}`,
+    description: `Create ${layout.table === "gpt" ? "GPT" : "MBR"} partition table`,
     argv: ["parted", "-s", device, "mklabel", layout.table],
   });
 
@@ -256,16 +256,16 @@ export function layoutCommands(device: string, layout: PartitionLayout): Planned
       layout.table === "gpt"
         ? ["mkpart", KIND_LABEL[spec.kind], PARTED_FS[spec.filesystem], `${startMiB}MiB`, end]
         : ["mkpart", "primary", PARTED_FS[spec.filesystem], `${startMiB}MiB`, end];
-    const sizeLabel = spec.sizeGiB !== undefined ? `${spec.sizeGiB} GiB` : "остаток";
+    const sizeLabel = spec.sizeGiB !== undefined ? `${spec.sizeGiB} GiB` : "rest";
     commands.push({
       phase: "partition",
-      description: `Раздел ${spec.number}: ${KIND_LABEL[spec.kind]} (${sizeLabel})`,
+      description: `Partition ${spec.number}: ${KIND_LABEL[spec.kind]} (${sizeLabel})`,
       argv: ["parted", "-s", device, ...mkpart],
     });
     if (spec.bootFlag) {
       commands.push({
         phase: "partition",
-        description: `Установить флаг ${spec.bootFlag} на раздел ${spec.number}`,
+        description: `Set ${spec.bootFlag} flag on partition ${spec.number}`,
         argv: ["parted", "-s", device, "set", `${spec.number}`, spec.bootFlag, "on"],
       });
     }
@@ -274,7 +274,7 @@ export function layoutCommands(device: string, layout: PartitionLayout): Planned
 
   commands.push({
     phase: "partition",
-    description: "Дождаться появления устройств",
+    description: "Wait for devices to appear",
     argv: ["udevadm", "settle"],
   });
 
@@ -283,74 +283,74 @@ export function layoutCommands(device: string, layout: PartitionLayout): Planned
     if (spec.kind === "esp") {
       commands.push({
         phase: "format",
-        description: `Форматировать ESP (FAT32): ${path}`,
+        description: `Format ESP (FAT32): ${path}`,
         argv: ["mkfs.fat", "-F32", path],
       });
     } else if (spec.kind === "root" && spec.filesystem === "btrfs") {
       commands.push({
         phase: "format",
-        description: `Форматировать root (btrfs): ${path}`,
+        description: `Format root (btrfs): ${path}`,
         argv: ["mkfs.btrfs", "-f", path],
       });
     } else if (spec.kind === "root") {
       commands.push({
         phase: "format",
-        description: `Форматировать root (ext4): ${path}`,
+        description: `Format root (ext4): ${path}`,
         argv: ["mkfs.ext4", "-F", path],
       });
     } else {
       commands.push({
         phase: "format",
-        description: `Подготовить swap: ${path}`,
+        description: `Set up swap: ${path}`,
         argv: ["mkswap", path],
       });
     }
   }
 
   const root = layout.partitions.find((spec) => spec.kind === "root");
-  if (!root) throw new Error("В раскладке нет раздела root");
+  if (!root) throw new Error("Layout has no root partition");
   const rootPath = part(root.number);
 
   if (root.btrfsSubvolumes) {
     commands.push(
       {
         phase: "mount",
-        description: "Примонтировать btrfs для создания subvolumes",
+        description: "Mount btrfs to create subvolumes",
         argv: ["mount", "-o", "compress=zstd,noatime", rootPath, "/mnt"],
       },
       ...["@", "@home", "@snapshots"].map((subvolume) => ({
         phase: "mount" as const,
-        description: `Создать subvolume ${subvolume}`,
+        description: `Create subvolume ${subvolume}`,
         argv: ["btrfs", "subvolume", "create", `/mnt/${subvolume}`],
       })),
       {
         phase: "mount",
-        description: "Временно отмонтировать",
+        description: "Temporarily unmount",
         argv: ["umount", "/mnt"],
       },
       {
         phase: "mount",
-        description: "Примонтировать @ в /mnt",
+        description: "Mount @ into /mnt",
         argv: ["mount", "-o", "subvol=@,compress=zstd,noatime", rootPath, "/mnt"],
       },
       {
         phase: "mount",
-        description: "Создать каталог /mnt/home",
+        description: "Create directory /mnt/home",
         argv: ["mkdir", "-p", "/mnt/home"],
       },
       {
         phase: "mount",
-        description: "Примонтировать @home в /mnt/home",
+        description: "Mount @home into /mnt/home",
         argv: ["mount", "-o", "subvol=@home,compress=zstd,noatime", rootPath, "/mnt/home"],
       },
       {
         phase: "mount",
-        description: "Создать каталог /mnt/.snapshots",
+        description: "Create directory /mnt/.snapshots",
         argv: ["mkdir", "-p", "/mnt/.snapshots"],
       },
       {
         phase: "mount",
-        description: "Примонтировать @snapshots в /mnt/.snapshots",
+        description: "Mount @snapshots into /mnt/.snapshots",
         argv: [
           "mount",
           "-o",
@@ -363,13 +363,13 @@ export function layoutCommands(device: string, layout: PartitionLayout): Planned
   } else if (root.filesystem === "btrfs") {
     commands.push({
       phase: "mount",
-      description: "Примонтировать root (btrfs) в /mnt",
+      description: "Mount root (btrfs) into /mnt",
       argv: ["mount", "-o", "compress=zstd,noatime", rootPath, "/mnt"],
     });
   } else {
     commands.push({
       phase: "mount",
-      description: "Примонтировать root (ext4) в /mnt",
+      description: "Mount root (ext4) into /mnt",
       argv: ["mount", rootPath, "/mnt"],
     });
   }
@@ -379,12 +379,12 @@ export function layoutCommands(device: string, layout: PartitionLayout): Planned
     commands.push(
       {
         phase: "mount",
-        description: "Создать каталог /mnt/boot/efi",
+        description: "Create directory /mnt/boot/efi",
         argv: ["mkdir", "-p", "/mnt/boot/efi"],
       },
       {
         phase: "mount",
-        description: "Примонтировать ESP в /mnt/boot/efi",
+        description: "Mount ESP into /mnt/boot/efi",
         argv: ["mount", part(esp.number), "/mnt/boot/efi"],
       },
     );
@@ -394,7 +394,7 @@ export function layoutCommands(device: string, layout: PartitionLayout): Planned
   if (swap) {
     commands.push({
       phase: "mount",
-      description: "Активировать swap",
+      description: "Enable swap",
       argv: ["swapon", part(swap.number)],
     });
   }
@@ -402,10 +402,10 @@ export function layoutCommands(device: string, layout: PartitionLayout): Planned
   return commands;
 }
 
-/** Команды монтирования существующих разделов для схемы keep (без форматирования). */
+/** Mounting commands for existing partitions in the keep layout (no formatting). */
 export function keepMountCommands(disk: DiskConfig): PlannedCommand[] {
   const commands: PlannedCommand[] = [];
-  if (!disk.rootPartition) throw new Error("Для схемы keep не выбран раздел root");
+  if (!disk.rootPartition) throw new Error("No root partition selected for the keep layout");
 
   const btrfsSubvol = disk.rootPartitionFstype === "btrfs" && disk.btrfsSubvolumes;
   const rootArgs = btrfsSubvol
@@ -413,7 +413,7 @@ export function keepMountCommands(disk: DiskConfig): PlannedCommand[] {
     : ["mount", disk.rootPartition, "/mnt"];
   commands.push({
     phase: "mount",
-    description: `Примонтировать ${disk.rootPartition} в /mnt`,
+    description: `Mount ${disk.rootPartition} into /mnt`,
     argv: rootArgs,
   });
 
@@ -421,12 +421,12 @@ export function keepMountCommands(disk: DiskConfig): PlannedCommand[] {
     commands.push(
       {
         phase: "mount",
-        description: "Создать каталог /mnt/boot/efi",
+        description: "Create directory /mnt/boot/efi",
         argv: ["mkdir", "-p", "/mnt/boot/efi"],
       },
       {
         phase: "mount",
-        description: `Примонтировать ESP ${disk.espPartition}`,
+        description: `Mount ESP ${disk.espPartition}`,
         argv: ["mount", disk.espPartition, "/mnt/boot/efi"],
       },
     );
@@ -435,7 +435,7 @@ export function keepMountCommands(disk: DiskConfig): PlannedCommand[] {
   if (disk.swap && disk.swapPartition) {
     commands.push({
       phase: "mount",
-      description: `Активировать swap ${disk.swapPartition}`,
+      description: `Enable swap ${disk.swapPartition}`,
       argv: ["swapon", disk.swapPartition],
     });
   }
@@ -443,7 +443,7 @@ export function keepMountCommands(disk: DiskConfig): PlannedCommand[] {
   return commands;
 }
 
-/** План команд подготовки диска по текущему конфигу и прошивке. */
+/** Plan of disk preparation commands from the current config and firmware. */
 export function planPartitionCommands(config: InstallConfig, firmware: Firmware): PlannedCommand[] {
   if (config.disk.layout === "keep") return keepMountCommands(config.disk);
   return layoutCommands(config.disk.device, buildPartitionLayout(config.disk, firmware));

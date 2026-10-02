@@ -1,5 +1,5 @@
 name: dev
-description: Инструменты разработчика на базе base
+description: Developer tools on top of base
 extends: base
 packages:
   - build-essential

@@ -25,7 +25,7 @@ describe("loadProfiles", () => {
   test("профиль без name — ошибка", async () => {
     const dir = `${import.meta.dir}/fixtures/broken`;
     await Bun.write(`${dir}/no-name.yaml`, "packages: [x]\n");
-    await expect(loadProfiles(dir)).rejects.toThrow(/отсутствует поле name/);
+    await expect(loadProfiles(dir)).rejects.toThrow(/missing name field/);
     await Bun.file(`${dir}/no-name.yaml`).delete();
   });
 });
@@ -44,12 +44,12 @@ describe("resolveProfile", () => {
   test("цикл в extends — ошибка", async () => {
     const profiles = await loadFixtures();
     expect(() => resolveProfile("cycle-a", profiles)).toThrow(ProfileResolveError);
-    expect(() => resolveProfile("cycle-a", profiles)).toThrow(/Цикл в extends/);
+    expect(() => resolveProfile("cycle-a", profiles)).toThrow(/Cycle in extends/);
   });
 
   test("отсутствующий родитель — ошибка", async () => {
     const profiles = await loadFixtures();
-    expect(() => resolveProfile("missing", profiles)).toThrow(/не найден/);
+    expect(() => resolveProfile("missing", profiles)).toThrow(/not found/);
   });
 });
 
@@ -57,7 +57,7 @@ describe("mergeProfiles", () => {
   test("конфликт файлов с разным содержимым — ошибка", async () => {
     const profiles = await loadFixtures();
     const list = [resolveProfile("conflict-a", profiles), resolveProfile("conflict-b", profiles)];
-    expect(() => mergeProfiles(list)).toThrow(/Конфликт файла \/etc\/x\.conf/);
+    expect(() => mergeProfiles(list)).toThrow(/File conflict \/etc\/x\.conf/);
   });
 
   test("одинаковые файлы из разных профилей дедуплицируются", async () => {

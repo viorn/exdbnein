@@ -3,29 +3,29 @@ import type { Step, StepResult } from "../ui/wizard.ts";
 
 export const localeStep: Step = {
   id: "locale",
-  title: "Локаль и время",
+  title: "Locale & time",
   async run({ config }): Promise<StepResult> {
     config.locale.locale = await text({
-      message: "Локаль",
+      message: "Locale",
       defaultValue: config.locale.locale,
-      placeholder: "ru_RU.UTF-8",
+      placeholder: "en_US.UTF-8",
     });
 
     config.locale.keymap = await text({
-      message: "Раскладка клавиатуры",
+      message: "Keyboard layout",
       defaultValue: config.locale.keymap,
-      placeholder: "us,ru",
+      placeholder: "us",
     });
 
     config.locale.timezone = await text({
-      message: "Часовой пояс",
+      message: "Time zone",
       defaultValue: config.locale.timezone,
-      placeholder: "Europe/Moscow",
+      placeholder: "UTC",
     });
 
     const next = await select<string>({
-      message: "Продолжить?",
-      options: [{ value: "next", label: "Продолжить" }, backOption()],
+      message: "Continue?",
+      options: [{ value: "next", label: "Continue" }, backOption()],
     });
     return isBack(next) ? { type: "back" } : { type: "continue" };
   },

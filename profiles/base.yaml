@@ -1,5 +1,5 @@
 name: base
-description: "Базовая система: SSH, sudo, базовые утилиты"
+description: "Base system: SSH, sudo, basic utilities"
 packages:
   - sudo
   - openssh-server
@@ -11,4 +11,4 @@ services:
   - ssh
 commands:
   - cmd: systemctl enable ssh
-    description: Автозапуск SSH
+    description: Enable SSH service

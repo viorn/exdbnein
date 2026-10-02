@@ -14,13 +14,14 @@ export * from "./review.ts";
 export * from "./users.ts";
 
 export interface BuildStepsOptions {
-  /** Каталог с YAML-профилями. */
+  /** Directory with YAML profiles. */
   profilesDir: string;
 }
 
 /**
- * В авторежиме шаги сбора конфигурации пропускаются целиком:
- * при полном конфиге вопросов не будет, при неполном — ревью упадёт со списком проблем.
+ * In unattended mode the config-collecting steps are skipped entirely:
+ * with a complete config there are no questions, with an incomplete one
+ * the review fails with the list of issues.
  */
 function skipWhenUnattended(step: Step): Step {
   return {
@@ -29,7 +30,7 @@ function skipWhenUnattended(step: Step): Step {
   };
 }
 
-/** Собирает список шагов визарда в порядке выполнения. */
+/** Builds the wizard step list in execution order. */
 export function buildSteps(options: BuildStepsOptions): Step[] {
   const steps: Step[] = [
     diskStep,
@@ -40,6 +41,6 @@ export function buildSteps(options: BuildStepsOptions): Step[] {
     reviewStep,
   ];
 
-  // Ревью в авторежиме выполняет проверку и авто-подтверждение, его не пропускаем.
+  // In unattended mode the review performs validation and auto-confirmation, don't skip it.
   return steps.map((step) => (step.id === "review" ? step : skipWhenUnattended(step)));
 }

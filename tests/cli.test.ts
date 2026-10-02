@@ -25,6 +25,6 @@ describe("parseArgs", () => {
   });
 
   test("бросает ошибку на неизвестный аргумент", () => {
-    expect(() => parseArgs(["--nope"])).toThrow("Неизвестный аргумент");
+    expect(() => parseArgs(["--nope"])).toThrow("Unknown argument");
   });
 });

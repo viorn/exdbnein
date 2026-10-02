@@ -4,7 +4,7 @@ import { dirname } from "node:path";
 export type LogLevel = "step" | "info" | "ok" | "warn" | "error";
 
 export interface LogRecord {
-  /** Время записи в ISO 8601. */
+  /** Record time in ISO 8601. */
   ts: string;
   level: LogLevel;
   message: string;
@@ -15,15 +15,16 @@ function timestamp(): string {
 }
 
 /**
- * Журнал установки (P7.2): собирает шаги и ошибки фазы B в памяти и дописывает их
- * в файл(ы) при flush. Запись — best-effort: если каталог недоступен (диск ещё не
- * размечен, права LiveCD), ошибки игнорируются — отчёт остаётся в памяти.
+ * Installation log (P7.2): collects phase B steps and errors in memory and appends
+ * them to file(s) on flush. Writing is best-effort: if the directory is unavailable
+ * (disk not partitioned yet, LiveCD permissions), errors are ignored — the report
+ * stays in memory.
  */
 export class InstallLogger {
   private records: LogRecord[] = [];
 
   constructor(
-    /** Файлы журнала; каждая запись дописывается во все. */
+    /** Log files; every record is appended to all of them. */
     private files: string[] = [],
   ) {}
 
@@ -55,7 +56,7 @@ export class InstallLogger {
     this.records.push({ ts: timestamp(), level, message });
   }
 
-  /** Дописывает накопленные записи во все файлы и очищает буфер. */
+  /** Appends the accumulated records to all files and clears the buffer. */
   async flush(): Promise<void> {
     if (this.records.length === 0) return;
     const text = `${this.records.map((record) => `[${record.ts}] ${record.level}: ${record.message}`).join("\n")}\n`;
@@ -69,6 +70,6 @@ async function appendLog(file: string, text: string): Promise<void> {
     await mkdir(dirname(file), { recursive: true });
     await appendFile(file, text, "utf8");
   } catch {
-    // best-effort: лог уже есть в памяти, каталог может быть недоступен
+    // best-effort: the log is already in memory, the directory may be unavailable
   }
 }

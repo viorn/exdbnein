@@ -33,9 +33,7 @@ describe("runLong", () => {
   });
 
   test("бросает ExecError при ненулевом коде", async () => {
-    await expect(runLong(["sh", "-c", "exit 3"], { label: "test fail" })).rejects.toThrow(
-      /кодом 3/,
-    );
+    await expect(runLong(["sh", "-c", "exit 3"], { label: "test fail" })).rejects.toThrow(/code 3/);
   });
 
   test("allowFailure возвращает ненулевой код без исключения", async () => {
@@ -50,7 +48,7 @@ describe("runLong", () => {
     const needle = "sleep 57493";
     await expect(
       runLong(["sh", "-c", needle], { label: "test timeout", timeoutMs: 400 }),
-    ).rejects.toThrow(/лимит времени/);
+    ).rejects.toThrow(/time limit/);
 
     // Даём процессам время завершиться и убеждаемся, что никого не осталось.
     await new Promise((resolve) => setTimeout(resolve, 300));

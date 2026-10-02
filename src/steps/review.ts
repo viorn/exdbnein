@@ -15,49 +15,49 @@ function formatDisk(disk: DiskConfig): string {
 
 function formatSummary(config: InstallConfig): string {
   const lines = [
-    `Диск:        ${formatDisk(config.disk)}`,
-    `Swap:        ${config.disk.swap ? `${config.disk.swapSizeGiB} GiB` : "нет"}`,
+    `Disk:        ${formatDisk(config.disk)}`,
+    `Swap:        ${config.disk.swap ? `${config.disk.swapSizeGiB} GiB` : "none"}`,
     `Hostname:    ${config.network.hostname}`,
-    `Сеть:        ${config.network.manager}`,
-    `Локаль:      ${config.locale.locale}`,
-    `Раскладка:   ${config.locale.keymap}`,
-    `Часовой пояс:${config.locale.timezone}`,
-    `Профили:     ${config.profiles.length ? config.profiles.join(", ") : "нет"}`,
-    `Пользователи:${config.users.map((u) => u.username).join(", ") || "нет"}`,
-    `Загрузчик:   ${config.bootloader.type}`,
-    `Зеркало:     ${config.mirror}`,
+    `Network:     ${config.network.manager}`,
+    `Locale:      ${config.locale.locale}`,
+    `Keymap:      ${config.locale.keymap}`,
+    `Time zone:   ${config.locale.timezone}`,
+    `Profiles:    ${config.profiles.length ? config.profiles.join(", ") : "none"}`,
+    `Users:       ${config.users.map((u) => u.username).join(", ") || "none"}`,
+    `Bootloader:  ${config.bootloader.type}`,
+    `Mirror:      ${config.mirror}`,
   ];
   return lines.join("\n");
 }
 
 export const reviewStep: Step = {
   id: "review",
-  title: "Проверка",
+  title: "Review",
   async run({ config }): Promise<StepResult> {
     const issues = validateConfig(config);
     if (issues.length > 0) {
       const text = issues.map((i) => `• ${i.path}: ${i.message}`).join("\n");
       const hint = config.unattended
-        ? "\n\nВ авторежиме требуется полный конфиг (--config <file>)."
+        ? "\n\nIn unattended mode a complete config is required (--config <file>)."
         : "";
-      throw new Error(`Конфигурация невалидна:\n${text}${hint}`);
+      throw new Error(`Invalid configuration:\n${text}${hint}`);
     }
 
-    // Мягкое предупреждение о недоступном зеркале (не блокирует установку).
+    // Soft warning about an unreachable mirror (does not block the installation).
     const reachable = await checkNetwork(config.mirror, 5000);
     if (!reachable) {
-      note("Зеркало недоступно — проверьте сеть или укажите другое зеркало.", "Предупреждение");
+      note("Mirror is unreachable — check the network or use another mirror.", "Warning");
     }
 
-    note(formatSummary(config), "План установки");
+    note(formatSummary(config), "Installation plan");
 
-    // В авторежиме ревью подтверждается автоматически.
+    // In unattended mode the review is confirmed automatically.
     if (config.unattended) return { type: "continue" };
 
     const choice = await select<string>({
-      message: "Начать установку?",
+      message: "Start installation?",
       initialValue: "install",
-      options: [{ value: "install", label: "Начать установку" }, backOption()],
+      options: [{ value: "install", label: "Start installation" }, backOption()],
     });
 
     return isBack(choice) ? { type: "back" } : { type: "continue" };

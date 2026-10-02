@@ -44,17 +44,17 @@ export async function confirm(opts: ConfirmOptions): Promise<boolean> {
   return value;
 }
 
-/** Значение опции «← Назад» в select/multiselect. */
+/** Value of the "← Back" option in select/multiselect. */
 export const BACK = "__back__";
 
-/** Проверяет, что пользователь выбрал «← Назад». */
+/** Checks that the user chose "← Back". */
 export function isBack(value: unknown): boolean {
   return value === BACK;
 }
 
-/** Опция «← Назад» для добавления в options списков выбора. */
-export function backOption(label = "← Назад"): Option<string> {
-  return { value: BACK, label, hint: "к предыдущему шагу" };
+/** The "← Back" option to add to the options of select lists. */
+export function backOption(label = "← Back"): Option<string> {
+  return { value: BACK, label, hint: "to previous step" };
 }
 
 export type { Option };

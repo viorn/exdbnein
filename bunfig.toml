@@ -1,0 +1,4 @@
+# Restrict test discovery to tests/ — otherwise `bun test` scans
+# build artifacts under out/ (LiveCD live-root) and hangs/runs out of memory.
+[test]
+root = "./tests"

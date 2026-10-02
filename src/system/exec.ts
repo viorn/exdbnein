@@ -7,7 +7,7 @@ export interface ExecResult {
 export interface ExecOptions {
   cwd?: string;
   env?: Record<string, string>;
-  /** Не бросать исключение при ненулевом коде выхода. */
+  /** Do not throw on a non-zero exit code. */
   allowFailure?: boolean;
 }
 
@@ -16,12 +16,12 @@ export class ExecError extends Error {
     readonly command: string,
     readonly result: ExecResult,
   ) {
-    super(`Команда завершилась с кодом ${result.code}: ${command}\n${result.stderr.trim()}`);
+    super(`Command exited with code ${result.code}: ${command}\n${result.stderr.trim()}`);
     this.name = "ExecError";
   }
 }
 
-/** Запускает команду и возвращает её вывод. Бросает ExecError при ошибке, если не allowFailure. */
+/** Runs a command and returns its output. Throws ExecError on failure unless allowFailure. */
 export async function exec(command: string[], options: ExecOptions = {}): Promise<ExecResult> {
   const proc = Bun.spawn(command, {
     cwd: options.cwd,
@@ -43,12 +43,12 @@ export async function exec(command: string[], options: ExecOptions = {}): Promis
   return result;
 }
 
-/** Запускает команду через shell (для пайпов и редиректов). */
+/** Runs a command through the shell (for pipes and redirections). */
 export async function shell(command: string, options: ExecOptions = {}): Promise<ExecResult> {
   return exec(["sh", "-c", command], options);
 }
 
-/** Проверяет, доступна ли утилита в PATH. */
+/** Checks whether a utility is available in PATH. */
 export async function hasCommand(name: string): Promise<boolean> {
   const result = await exec(["sh", "-c", `command -v ${name}`], { allowFailure: true });
   return result.code === 0;

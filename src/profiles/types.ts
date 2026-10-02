@@ -1,30 +1,30 @@
 /**
- * Один файл для записи в целевую систему. Путь — относительно корня целевой системы:
- * writer добавляет префикс точки монтирования (P7.1): `/etc/x` → `/mnt/etc/x`.
+ * One file to write into the target system. The path is relative to the target
+ * system root: the writer adds the mount point prefix (P7.1): `/etc/x` → `/mnt/etc/x`.
  */
 export interface ProfileFile {
   path: string;
   content: string;
-  /** Права доступа в формате "0644". */
+  /** Permissions in "0644" format. */
   mode: string;
 }
 
 /**
- * Команда, выполняемая в chroot целевой системы (P7.1): видит корень целевой системы
- * напрямую (`/etc/x`), в отличие от файлов, которые пишутся с префиксом /mnt.
+ * Command executed in the target system chroot (P7.1): it sees the target system
+ * root directly (`/etc/x`), unlike files which are written with the /mnt prefix.
  */
 export interface ProfileCommand {
   cmd: string;
   description?: string;
-  /** Не прерывать установку при ошибке выполнения. */
+  /** Do not interrupt the installation on a run failure. */
   optional?: boolean;
 }
 
-/** Сырой (не разрешённый) профиль из YAML. */
+/** Raw (unresolved) profile from YAML. */
 export interface Profile {
   name: string;
   description?: string;
-  /** Имя или список имён родительских профилей. */
+  /** Name or list of names of parent profiles. */
   extends?: string | string[];
   packages: string[];
   services: string[];
@@ -32,18 +32,18 @@ export interface Profile {
   files: ProfileFile[];
 }
 
-/** Профиль после резолва наследования (плоский список, порядок применения сохранён). */
+/** Profile after resolving inheritance (flat list, application order preserved). */
 export interface ResolvedProfile {
   name: string;
   packages: string[];
   services: string[];
   commands: ProfileCommand[];
   files: ProfileFile[];
-  /** Цепочка предков от дальних к ближним (без самого профиля). */
+  /** Ancestor chain from farthest to nearest (without the profile itself). */
   parents: string[];
 }
 
-/** Объединение нескольких выбранных профилей. */
+/** Merge of several selected profiles. */
 export interface MergedProfiles {
   packages: string[];
   services: string[];

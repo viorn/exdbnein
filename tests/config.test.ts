@@ -43,7 +43,7 @@ describe("validateConfig", () => {
       { username: "user", passwordHash: "x", sudo: true, sshKeys: [] },
       { username: "user", passwordHash: "y", sudo: false, sshKeys: [] },
     ];
-    expect(validateConfig(config).some((i) => i.message.includes("Дублирующееся"))).toBe(true);
+    expect(validateConfig(config).some((i) => i.message.includes("Duplicate"))).toBe(true);
   });
 
   test("ловит неверное зеркало", () => {

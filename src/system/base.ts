@@ -5,32 +5,32 @@ import { chrootMounts, inChroot, isMounted, TARGET_ROOT } from "./chroot.ts";
 import type { Firmware } from "./environment.ts";
 import { exec } from "./exec.ts";
 
-/** Действие плана фазы B: команда, запись файла или генерация fstab. */
+/** Plan action of phase B: command, file write or fstab generation. */
 export interface PlannedAction {
   description: string;
-  /** Команда для выполнения в отдельной группе процессов (см. run.ts). */
+  /** Command to run in a separate process group (see run.ts). */
   argv?: string[];
-  /** Файл в целевом корне. */
+  /** File in the target root. */
   file?: { path: string; content: string; mode?: string };
-  /** Сгенерировать /etc/fstab по фактическим монтированиям. */
+  /** Generate /etc/fstab from the actual mounts. */
   generateFstab?: boolean;
-  /** Лимит времени для argv (по умолчанию — 30 минут). */
+  /** Time limit for argv (default — 30 minutes). */
   timeoutMs?: number;
-  /** Ошибка выполнения не прерывает установку (команды профилей с optional). */
+  /** A failure does not interrupt the installation (optional profile commands). */
   optional?: boolean;
 }
 
-/** Кодовое имя стабильного Debian для debootstrap/apt. */
+/** Codename of stable Debian for debootstrap/apt. */
 export const DEBOOTSTRAP_SUITE = "stable";
-/** Компоненты архивов Debian 12+ (включая non-free-firmware); для debootstrap --components=. */
+/** Debian archive components (12+, incl. non-free-firmware); for debootstrap --components=. */
 export const APT_COMPONENTS = "main,contrib,non-free,non-free-firmware";
-/** Те же компоненты для sources.list (разделитель — пробел). */
+/** The same components for sources.list (space-separated). */
 const SOURCES_COMPONENTS = "main contrib non-free non-free-firmware";
 
-/** Лимиты для долгих шагов. */
+/** Limits for long steps. */
 export const APT_UPDATE_TIMEOUT_MS = 10 * 60 * 1000;
 
-/** Команда debootstrap: минимальная база stable в целевой корень с зеркалом. */
+/** debootstrap command: minimal stable base into the target root with a mirror. */
 export function debootstrapCommand(config: InstallConfig): string[] {
   return [
     "debootstrap",
@@ -43,7 +43,7 @@ export function debootstrapCommand(config: InstallConfig): string[] {
   ];
 }
 
-/** sources.list целевой системы: stable + updates + security. */
+/** sources.list of the target system: stable + updates + security. */
 export function sourcesListContent(mirror: string): string {
   const mirrorBase = mirror.replace(/\/+$/, "");
   return [
@@ -54,12 +54,12 @@ export function sourcesListContent(mirror: string): string {
   ].join("\n");
 }
 
-/** Базовая система уже установлена: есть метаданные Debian в целевом корне. */
+/** The base system is already installed: Debian metadata exists in the target root. */
 export async function isBaseInstalled(root = TARGET_ROOT): Promise<boolean> {
   return Bun.file(`${root}/etc/debian_version`).exists();
 }
 
-/** Пакет установлен в целевом корне (dpkg-query в chroot). */
+/** A package is installed in the target root (dpkg-query in chroot). */
 export async function isPackageInstalled(pkg: string, root = TARGET_ROOT): Promise<boolean> {
   const result = await exec(inChroot(["dpkg-query", "-W", `-f=\${Status}`, pkg], root), {
     allowFailure: true,
@@ -67,7 +67,7 @@ export async function isPackageInstalled(pkg: string, root = TARGET_ROOT): Promi
   return result.code === 0 && result.stdout.trim() === "install ok installed";
 }
 
-/** Есть ли файлы в каталоге (для идемпотентности apt-списков). */
+/** Whether the directory has any files (idempotency of apt lists). */
 async function dirHasFiles(dir: string): Promise<boolean> {
   try {
     return (await readdir(dir)).length > 0;
@@ -76,7 +76,7 @@ async function dirHasFiles(dir: string): Promise<boolean> {
   }
 }
 
-/** Записывает файл в целевую систему (создаёт каталоги, выставляет права). */
+/** Writes a file into the target system (creates directories, sets permissions). */
 export async function writeTargetFile(file: {
   path: string;
   content: string;
@@ -89,20 +89,20 @@ export async function writeTargetFile(file: {
   }
 }
 
-// ---- План этапа 5 (идемпотентный) ------------------------------------------
+// ---- Stage 5 plan (idempotent) ------------------------------------------------
 
-/** debootstrap — только если база ещё не установлена. */
+/** debootstrap — only if the base is not installed yet. */
 export async function planDebootstrap(config: InstallConfig): Promise<PlannedAction[]> {
   if (await isBaseInstalled()) return [];
   return [
     {
-      description: `debootstrap ${DEBOOTSTRAP_SUITE} в ${TARGET_ROOT} (${config.mirror})`,
+      description: `debootstrap ${DEBOOTSTRAP_SUITE} into ${TARGET_ROOT} (${config.mirror})`,
       argv: debootstrapCommand(config),
     },
   ];
 }
 
-/** Монтирования псевдо-ФС — только те, что ещё не примонтированы. */
+/** Pseudo-FS mounts — only those not mounted yet. */
 export async function planChrootMounts(firmware: Firmware): Promise<PlannedAction[]> {
   const actions: PlannedAction[] = [];
   for (const mount of chrootMounts(firmware)) {
@@ -112,7 +112,7 @@ export async function planChrootMounts(firmware: Firmware): Promise<PlannedActio
   return actions;
 }
 
-/** Копирует хостовый resolv.conf — без DNS apt в chroot не увидит зеркало. */
+/** Copies the host resolv.conf — without DNS apt in the chroot cannot see the mirror. */
 export async function planResolvConf(): Promise<PlannedAction[]> {
   const content = await Bun.file("/etc/resolv.conf")
     .text()
@@ -120,46 +120,46 @@ export async function planResolvConf(): Promise<PlannedAction[]> {
   if (!content.trim()) return [];
   return [
     {
-      description: "Скопировать /etc/resolv.conf в целевую систему",
+      description: "Copy /etc/resolv.conf into the target system",
       file: { path: `${TARGET_ROOT}/etc/resolv.conf`, content, mode: "0644" },
     },
   ];
 }
 
-/** apt-get в chroot с неинтерактивным debconf (P6.1) и -y. */
+/** apt-get in chroot with non-interactive debconf (P6.1) and -y. */
 export function aptGet(...args: string[]): string[] {
   return inChroot(["env", "DEBIAN_FRONTEND=noninteractive", "apt-get", "-y", ...args]);
 }
 
-/** apt-get update — только если списки пакетов ещё не загружены. */
+/** apt-get update — only if the package lists are not downloaded yet. */
 export async function planAptUpdate(): Promise<PlannedAction[]> {
   if (await dirHasFiles(`${TARGET_ROOT}/var/lib/apt/lists`)) return [];
   return [
     {
-      description: "Обновить списки пакетов (apt-get update)",
+      description: "Update package lists (apt-get update)",
       argv: aptGet("update"),
       timeoutMs: APT_UPDATE_TIMEOUT_MS,
     },
   ];
 }
 
-/** Ядро и firmware — только если ядро ещё не установлено. */
+/** Kernel and firmware — only if the kernel is not installed yet. */
 export async function planKernelInstall(): Promise<PlannedAction[]> {
   if (await isPackageInstalled("linux-image-amd64")) return [];
   return [
     {
-      description: "Установить ядро linux-image-amd64 и firmware-linux",
+      description: "Install kernel linux-image-amd64 and firmware-linux",
       argv: aptGet("install", "--no-install-recommends", "linux-image-amd64", "firmware-linux"),
     },
   ];
 }
 
-/** fstab — только если ещё не сгенерирован. */
+/** fstab — only if it is not generated yet. */
 export async function planFstab(): Promise<PlannedAction[]> {
   if (await Bun.file(`${TARGET_ROOT}/etc/fstab`).exists()) return [];
   return [
     {
-      description: "Сгенерировать /etc/fstab по UUID",
+      description: "Generate /etc/fstab by UUID",
       generateFstab: true,
     },
   ];

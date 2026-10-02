@@ -1,9 +1,9 @@
 #!/usr/bin/expect -f
-# Дымовой прогон визарда в псевдо-TTY: проходит все шаги и сохраняет конфиг.
+# Wizard smoke test in a pseudo-TTY: goes through all steps and saves the config.
 set timeout 30
 set env(TERM) xterm-256color
 
-# Отвечает на промпт: ждёт текст, даёт интерфейсу отрисоваться и отправляет ответ.
+# Answers a prompt: waits for the text, lets the interface render and sends the reply.
 proc answer {pattern reply} {
     expect -re $pattern
     after 250
@@ -12,25 +12,26 @@ proc answer {pattern reply} {
 
 spawn bun run src/index.ts -c /tmp/exdbnein-config.json
 
-answer "Устройство для установки" "/dev/sda\r"
-answer "Файловая система" "\r"
+answer "Target disk" "/dev/sda\r"
+answer "Partitioning scheme" "\r"
+answer "Filesystem" "\r"
 answer "subvolumes" "\r"
-answer "swap-раздел" "\r"
-answer "Размер swap" "\r"
+answer "swap partition" "\r"
+answer "Swap size" "\r"
 
-answer "Локаль" "ru_RU.UTF-8\r"
-answer "Раскладка" "us,ru\r"
-answer "Часовой пояс" "Europe/Moscow\r"
+answer "Locale" "en_US.UTF-8\r"
+answer "Keyboard layout" "us\r"
+answer "Time zone" "UTC\r"
 
-answer "hostname" "testbox\r"
-answer "Менеджер сети" "\r"
+answer "Hostname" "testbox\r"
+answer "Network manager" "\r"
 
-answer "Пароль root" "rootpass\r"
-answer "Имя пользователя" "alice\r"
-answer "Пароль для alice" "alicepass\r"
-answer "группу sudo" "\r"
-answer "ещё пользователя" "\r"
+answer "Root password" "rootpass\r"
+answer "Username" "alice\r"
+answer "Password for alice" "alicepass\r"
+answer "sudo group" "\r"
+answer "another user" "\r"
 
-answer "Начать установку" "\r"
+answer "Start installation" "\r"
 
 expect eof

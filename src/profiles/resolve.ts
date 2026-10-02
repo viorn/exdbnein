@@ -1,6 +1,6 @@
 import type { MergedProfiles, Profile, ResolvedProfile } from "./types.ts";
 
-/** Ошибка резолва профилей: цикл extends, отсутствующий родитель или конфликт файлов. */
+/** Profile resolution error: extends cycle, missing parent or file conflict. */
 export class ProfileResolveError extends Error {
   constructor(message: string) {
     super(message);
@@ -14,9 +14,9 @@ function parentsOf(profile: Profile): string[] {
 }
 
 /**
- * Разрешает профиль: DFS-обход предков (topological order) с защитой от циклов.
- * Правила слияния: packages/services — union с дедупликацией; commands/files —
- * конкатенация с сохранением порядка (родители раньше потомков).
+ * Resolves a profile: DFS walk over ancestors (topological order) with cycle protection.
+ * Merge rules: packages/services — deduplicated union; commands/files —
+ * concatenation preserving order (parents before children).
  */
 export function resolveProfile(
   name: string,
@@ -29,11 +29,11 @@ export function resolveProfile(
   const visit = (current: string): void => {
     if (visited.has(current)) return;
     if (path.has(current)) {
-      throw new ProfileResolveError(`Цикл в extends: ${[...path, current].join(" → ")}`);
+      throw new ProfileResolveError(`Cycle in extends: ${[...path, current].join(" → ")}`);
     }
     const profile = profiles.get(current);
     if (!profile) {
-      throw new ProfileResolveError(`Профиль "${current}" не найден (extends)`);
+      throw new ProfileResolveError(`Profile "${current}" not found (extends)`);
     }
     path.add(current);
     for (const parent of parentsOf(profile)) visit(parent);
@@ -68,7 +68,7 @@ export function resolveProfile(
   };
 }
 
-/** Объединяет несколько разрешённых профилей. Конфликт файлов с разным содержимым — ошибка. */
+/** Merges several resolved profiles. A file conflict with different content is an error. */
 export function mergeProfiles(list: ResolvedProfile[]): MergedProfiles {
   const packages = new Set<string>();
   const services = new Set<string>();
@@ -85,7 +85,7 @@ export function mergeProfiles(list: ResolvedProfile[]): MergedProfiles {
       const prev = fileOwners.get(file.path);
       if (prev && prev.content !== file.content) {
         throw new ProfileResolveError(
-          `Конфликт файла ${file.path}: разное содержимое в "${prev.owner}" и "${resolved.name}"`,
+          `File conflict ${file.path}: different content in "${prev.owner}" and "${resolved.name}"`,
         );
       }
       if (!prev) {
@@ -98,7 +98,7 @@ export function mergeProfiles(list: ResolvedProfile[]): MergedProfiles {
   return { packages: [...packages], services: [...services], commands, files };
 }
 
-/** Разрешает список выбранных профилей и объединяет их в один итоговый набор. */
+/** Resolves the list of selected profiles and merges them into one final set. */
 export function resolveProfiles(
   names: string[],
   profiles: ReadonlyMap<string, Profile>,

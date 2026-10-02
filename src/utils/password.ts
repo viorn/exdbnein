@@ -1,6 +1,6 @@
 /**
- * Хеширование паролей в формате crypt(3) (sha512-crypt) — именно он попадает
- * в /etc/shadow. Пароль передаётся через stdin, чтобы не светиться в списке процессов.
+ * Password hashing in crypt(3) format (sha512-crypt) — exactly what goes into
+ * /etc/shadow. The password is passed via stdin so it does not show in the process list.
  */
 
 async function opensslPasswd(password: string, salt?: string): Promise<string> {
@@ -19,17 +19,17 @@ async function opensslPasswd(password: string, salt?: string): Promise<string> {
   ]);
 
   if (code !== 0) {
-    throw new Error(`Не удалось захешировать пароль: ${stderr.trim()}`);
+    throw new Error(`Failed to hash password: ${stderr.trim()}`);
   }
   return stdout.trim();
 }
 
-/** Возвращает sha512-crypt хеш пароля со случайной солью. */
+/** Returns a sha512-crypt hash of the password with a random salt. */
 export async function hashPassword(password: string): Promise<string> {
   return opensslPasswd(password);
 }
 
-/** Проверяет пароль против ранее полученного хеша. */
+/** Verifies a password against a previously obtained hash. */
 export async function verifyPassword(password: string, hash: string): Promise<boolean> {
   const salt = hash.split("$")[2];
   if (!salt) return false;

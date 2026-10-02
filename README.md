@@ -56,7 +56,18 @@ bun run build:live              # bash livecd/build.sh → out/exdbnein-stable.i
 Требования к хосту (root, amd64): `debootstrap`, `squashfs-tools`, `xorriso`,
 `grub-pc-bin`, `grub-efi-amd64-bin`, `mtools`, `debian-archive-keyring`, рантайм `bun`.
 Параметры сборки — окружение (`SUITE`, `MIRROR`, `ISO_NAME`, `SOURCE_DATE_EPOCH`,
-`KEEP_WORK`). Подробности — `livecd/build.sh` и `plans/phase8.md`.
+`KEEP_WORK`, `BUN`). Подробности — `livecd/build.sh` и `plans/phase8.md`.
+
+Сборка требует root, а `bun` обычно стоит только в `~/.bun/bin` пользователя, куда
+`sudo` не заглядывает (secure_path). Запускайте одним из способов:
+
+```bash
+sudo env "PATH=$PATH" bash livecd/build.sh            # пробросить пользовательский PATH
+BUN=/path/to/bun sudo -E bash livecd/build.sh          # явно указать путь к bun
+```
+
+Если `BUN` не задан, скрипт сам ищет `bun` в `PATH`, `~/.bun/bin` и `~/.local/bin`
+текущего пользователя и пользователя `SUDO_USER`.
 
 ## CI
 

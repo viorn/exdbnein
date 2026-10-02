@@ -6,7 +6,7 @@ export type StepResult = { type: "continue" } | { type: "back" };
 
 export interface StepContext {
   config: InstallConfig;
-  /** Номер шага (1-based) и общее число шагов. */
+  /** 1-based step index and the total number of steps. */
   index: number;
   total: number;
 }
@@ -14,7 +14,7 @@ export interface StepContext {
 export interface Step {
   id: string;
   title: string;
-  /** Возвращает true, если шаг нужно пропустить при текущем конфиге. */
+  /** Returns true if the step must be skipped with the current config. */
   skip?: (config: InstallConfig) => boolean;
   run: (ctx: StepContext) => Promise<StepResult>;
 }
@@ -23,18 +23,18 @@ export interface WizardOptions {
   title: string;
   steps: Step[];
   config: InstallConfig;
-  /** Вызывается после каждого шага — например, для автосохранения конфига. */
+  /** Called after every step — e.g. to auto-save the config. */
   onStepDone?: (step: Step, config: InstallConfig) => Promise<void> | void;
 }
 
-/** Последовательно выполняет шаги визарда, мутируя общий конфиг. */
+/** Runs the wizard steps sequentially, mutating the shared config. */
 export async function runWizard(options: WizardOptions): Promise<InstallConfig> {
   const { title, steps, config } = options;
   const active = steps.filter((step) => !step.skip?.(config));
 
   intro(title);
 
-  /** Стек: при back возвращаемся к шагу с этим индексом. */
+  /** Stack: on back we return to the step with this index. */
   const stack: number[] = [];
 
   let i = 0;
@@ -44,23 +44,23 @@ export async function runWizard(options: WizardOptions): Promise<InstallConfig> 
       i++;
       continue;
     }
-    note(`Шаг ${i + 1} из ${active.length}`, step.title);
+    note(`Step ${i + 1} of ${active.length}`, step.title);
     const result = await step.run({ config, index: i + 1, total: active.length });
 
     await options.onStepDone?.(step, config);
 
     if (result.type === "back") {
-      // На первом шаге возвращаться некуда — просто перезапускаем его.
+      // On the first step there is nowhere to go back — just restart it.
       const prev = stack.pop();
       if (prev !== undefined) i = prev;
     } else {
-      // При успешном шаге кладём в стек *текущий* шаг (куда вернёмся при back)
+      // On a successful step push the *current* step onto the stack (where back returns).
       stack.push(i);
       i++;
     }
   }
 
-  outro("Готово");
+  outro("Done");
   return config;
 }
 

@@ -18,7 +18,7 @@ import { CancelledError } from "../ui/errors.ts";
 import { confirm } from "../ui/prompts.ts";
 import type { InstallContext, InstallStage } from "./index.ts";
 
-/** Печатает план действий (dry-run, ничего не выполняется). */
+/** Prints the action plan (dry-run, nothing executes). */
 function printPlan(plan: PlannedAction[]): void {
   for (const action of plan) {
     if (action.argv) {
@@ -29,7 +29,7 @@ function printPlan(plan: PlannedAction[]): void {
   }
 }
 
-/** Выполняет одно действие плана: команду или запись файла в целевой корень. */
+/** Runs one plan action: a command or a file write into the target root. */
 async function runAction(action: PlannedAction): Promise<void> {
   if (action.argv) {
     await runLong(action.argv, { label: action.description });
@@ -39,13 +39,13 @@ async function runAction(action: PlannedAction): Promise<void> {
 }
 
 /**
- * Этап 6: настройка установленной системы — hostname, локали/раскладка/timezone
- * (debconf-пресеты, P6.1), пользователи и sudo, SSH-ключи (P6.3), сеть, GRUB
- * (BIOS/UEFI) с os-prober по умолчанию выключенным (P6.2). Все шаги идемпотентны.
+ * Stage 6: configuring the installed system — hostname, locales/layout/timezone
+ * (debconf presets, P6.1), users and sudo, SSH keys (P6.3), network, GRUB
+ * (BIOS/UEFI) with os-prober disabled by default (P6.2). All steps are idempotent.
  */
 export const configureSystemStage: InstallStage = {
   id: "configure",
-  title: "Настройка системы",
+  title: "System configuration",
   async run(ctx: InstallContext): Promise<void> {
     const { config, interactive } = ctx;
     const firmware = await detectFirmware();
@@ -64,20 +64,20 @@ export const configureSystemStage: InstallStage = {
     ];
 
     if (plan.length === 0) {
-      log.info("Система уже настроена — шаги этапа пропущены.");
+      log.info("System is already configured — stage steps skipped.");
       return;
     }
 
-    log.info("План (dry-run):");
+    log.info("Plan (dry-run):");
     printPlan(plan);
 
     if (interactive) {
       const confirmed = await confirm({
-        message: "Применить настройки системы (локали, пользователи, сеть, GRUB)?",
+        message: "Apply system settings (locales, users, network, GRUB)?",
         initialValue: false,
       });
       if (!confirmed) {
-        throw new CancelledError("Установка отменена: настройка системы не подтверждена");
+        throw new CancelledError("Installation cancelled: system settings not confirmed");
       }
     }
 
@@ -85,6 +85,6 @@ export const configureSystemStage: InstallStage = {
       await runAction(action);
     }
 
-    log.success("Система настроена");
+    log.success("System configured");
   },
 };

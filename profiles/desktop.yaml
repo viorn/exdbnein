@@ -1,5 +1,5 @@
 name: desktop
-description: Рабочий стол XFCE на базе base
+description: XFCE desktop on top of base
 extends: base
 packages:
   - xorg
@@ -12,4 +12,4 @@ services:
   - NetworkManager
 commands:
   - cmd: systemctl set-default graphical.target
-    description: Загрузка в графический режим
+    description: Boot into graphical mode

@@ -4,27 +4,27 @@ import type { Step, StepResult } from "../ui/wizard.ts";
 
 export const networkStep: Step = {
   id: "network",
-  title: "Сеть",
+  title: "Network",
   async run({ config }): Promise<StepResult> {
     config.network.hostname = await text({
-      message: "Имя компьютера (hostname)",
+      message: "Hostname",
       defaultValue: config.network.hostname,
       validate: (value) => {
-        if (!value) return "Укажите hostname";
+        if (!value) return "Provide a hostname";
         if (!/^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(value)) {
-          return "Некорректный hostname";
+          return "Invalid hostname";
         }
         return undefined;
       },
     });
 
     const manager = await select<string>({
-      message: "Менеджер сети",
+      message: "Network manager",
       initialValue: config.network.manager,
       options: [
-        { value: "networkmanager", label: "NetworkManager", hint: "для десктопа" },
-        { value: "systemd-networkd", label: "systemd-networkd", hint: "минималистично" },
-        { value: "none", label: "Не настраивать" },
+        { value: "networkmanager", label: "NetworkManager", hint: "for desktop" },
+        { value: "systemd-networkd", label: "systemd-networkd", hint: "minimal" },
+        { value: "none", label: "Do not configure" },
         backOption(),
       ],
     });

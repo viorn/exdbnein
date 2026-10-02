@@ -9,10 +9,10 @@ import { buildSteps } from "./steps/index.ts";
 import { isLiveEnvironment, isRoot, LIVE_MARKER } from "./system/environment.ts";
 import { CancelledError, confirm, runWizard } from "./ui/index.ts";
 
-/** Черновик последней сессии — чтобы краш не терял ввод. */
+/** Draft of the last session — so a crash does not lose the input. */
 const DRAFT_FILE = join(tmpdir(), "exdbnein-last.json");
 
-/** Читает черновик предыдущей сессии, если он есть и валиден. */
+/** Reads the previous session draft, if it exists and is valid. */
 async function loadDraft(): Promise<InstallConfig | null> {
   try {
     if (!(await Bun.file(DRAFT_FILE).exists())) return null;
@@ -22,7 +22,7 @@ async function loadDraft(): Promise<InstallConfig | null> {
   }
 }
 
-/** Загружает конфиг: файл --config, иначе черновик (с вопросом), иначе дефолты. */
+/** Loads the config: --config file, otherwise the draft (with a question), otherwise defaults. */
 async function loadOrInit(options: {
   config?: string;
   unattended: boolean;
@@ -36,7 +36,7 @@ async function loadOrInit(options: {
     const draft = await loadDraft();
     if (draft) {
       const restore = await confirm({
-        message: "Найдена незавершённая сессия. Восстановить?",
+        message: "Found an unfinished session. Restore it?",
         initialValue: true,
       });
       if (restore) return draft;
@@ -46,18 +46,18 @@ async function loadOrInit(options: {
   return defaultConfig();
 }
 
-/** Pre-flight: безопасность перед запуском визарда (этап 3). */
+/** Pre-flight: safety before launching the wizard (stage 3). */
 async function checkEnvironment(force: boolean): Promise<void> {
   const root = await isRoot();
   if (!root) {
-    throw new Error("Требуются права root — установщик изменяет систему");
+    throw new Error("Root privileges are required — the installer modifies the system");
   }
 
   const live = await isLiveEnvironment();
   if (!live && !force) {
     throw new Error(
-      `Установщик запускается только внутри LiveCD (маркер ${LIVE_MARKER} не найден). ` +
-        "Для разработки используйте --force.",
+      `The installer runs only inside the LiveCD (marker ${LIVE_MARKER} not found). ` +
+        "Use --force for development.",
     );
   }
 }
@@ -76,11 +76,11 @@ async function main(): Promise<void> {
   config.unattended = options.unattended;
 
   await runWizard({
-    title: "exdbnein — установка Debian",
+    title: "exdbnein — Debian installer",
     steps: buildSteps({ profilesDir: options.profilesDir }),
     config,
     onStepDone: async (_step, current) => {
-      // Черновик сохраняем всегда, --config — дополнительно.
+      // Always save the draft; --config is saved additionally.
       await saveConfig(current, DRAFT_FILE);
       if (options.config) await saveConfig(current, options.config);
     },
@@ -88,10 +88,10 @@ async function main(): Promise<void> {
 
   if (options.config) {
     await saveConfig(config, options.config);
-    log.success(`Конфигурация сохранена: ${options.config}`);
+    log.success(`Configuration saved: ${options.config}`);
   }
 
-  // Фаза B: применение конфигурации (этапы 4–7).
+  // Phase B: applying the configuration (stages 4–7).
   await runInstall(config, {
     interactive: !config.unattended,
     profilesDir: options.profilesDir,

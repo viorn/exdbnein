@@ -19,30 +19,30 @@ import { CancelledError } from "../ui/errors.ts";
 import { confirm } from "../ui/prompts.ts";
 import type { InstallContext, InstallStage } from "./index.ts";
 
-/** Возможные расположения ключей архива Debian (P5.1). */
+/** Possible locations of the Debian archive keys (P5.1). */
 const KEYRING_PATHS = [
   "/usr/share/keyrings/debian-archive-keyring.gpg",
   "/usr/share/debian-archive-keyring.gpg",
 ];
 
 /**
- * P5.1: в LiveCD обязаны быть debootstrap и ключи архива; в офлайне —
- * понятный отказ, а не падение посреди установки.
+ * P5.1: debootstrap and the archive keys must exist in the LiveCD; offline —
+ * a clear refusal instead of a crash in the middle of the installation.
  */
 async function preflight(): Promise<void> {
   if (!(await hasCommand("debootstrap"))) {
-    throw new Error("debootstrap не найден — он должен быть предустановлен в LiveCD (см. этап 8)");
+    throw new Error("debootstrap not found — it must be preinstalled in the LiveCD (see stage 8)");
   }
   const keyrings = await Promise.all(KEYRING_PATHS.map((path) => Bun.file(path).exists()));
   if (!keyrings.some(Boolean)) {
     throw new Error(
-      "debian-archive-keyring не найден — установите пакет debian-archive-keyring " +
-        "в LiveCD (P5.1)",
+      "debian-archive-keyring not found — install the debian-archive-keyring package " +
+        "in the LiveCD (P5.1)",
     );
   }
 }
 
-/** Печатает план действий (dry-run, ничего не выполняется). */
+/** Prints the action plan (dry-run, nothing executes). */
 function printPlan(plan: PlannedAction[]): void {
   for (const action of plan) {
     if (action.argv) {
@@ -55,7 +55,7 @@ function printPlan(plan: PlannedAction[]): void {
   }
 }
 
-/** Выполняет одно действие плана: команду, запись файла или генерацию fstab. */
+/** Runs one plan action: a command, file write or fstab generation. */
 async function runAction(action: PlannedAction): Promise<void> {
   if (action.argv) {
     await runLong(action.argv, { label: action.description, timeoutMs: action.timeoutMs });
@@ -68,13 +68,13 @@ async function runAction(action: PlannedAction): Promise<void> {
 }
 
 /**
- * Этап 5: установка минимальной Debian-системы в /mnt — debootstrap, chroot-монтирования,
- * sources.list, ядро и firmware, fstab по UUID. Все шаги идемпотентны: повторный вход
- * поверх готовой базы не ломает установленное.
+ * Stage 5: installing a minimal Debian system into /mnt — debootstrap, chroot mounts,
+ * sources.list, kernel and firmware, fstab by UUID. All steps are idempotent:
+ * re-entering over a ready base does not break what is installed.
  */
 export const installBaseStage: InstallStage = {
   id: "base",
-  title: "Установка базовой системы",
+  title: "Base system installation",
   async run(ctx: InstallContext): Promise<void> {
     const { config, interactive } = ctx;
 
@@ -86,7 +86,7 @@ export const installBaseStage: InstallStage = {
       ...(await planChrootMounts(firmware)),
       ...(await planResolvConf()),
       {
-        description: "Записать /etc/apt/sources.list",
+        description: "Write /etc/apt/sources.list",
         file: {
           path: `${TARGET_ROOT}/etc/apt/sources.list`,
           content: sourcesListContent(config.mirror),
@@ -99,20 +99,20 @@ export const installBaseStage: InstallStage = {
     ];
 
     if (plan.length === 0) {
-      log.info("Базовая система уже установлена — шаги этапа пропущены.");
+      log.info("Base system is already installed — stage steps skipped.");
       return;
     }
 
-    log.info("План (dry-run):");
+    log.info("Plan (dry-run):");
     printPlan(plan);
 
     if (interactive) {
       const confirmed = await confirm({
-        message: "Выполнить установку базовой системы? Это займёт несколько минут",
+        message: "Run base system installation? This will take a few minutes",
         initialValue: false,
       });
       if (!confirmed) {
-        throw new CancelledError("Установка отменена: базовая система не установлена");
+        throw new CancelledError("Installation cancelled: base system not installed");
       }
     }
 
@@ -120,6 +120,6 @@ export const installBaseStage: InstallStage = {
       await runAction(action);
     }
 
-    log.success("Базовая система установлена");
+    log.success("Base system installed");
   },
 };

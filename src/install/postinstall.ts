@@ -17,38 +17,38 @@ import { CancelledError } from "../ui/errors.ts";
 import { confirm } from "../ui/prompts.ts";
 import type { InstallContext, InstallStage } from "./index.ts";
 
-/** Действие плана этапа 7: команда, файл или запись с маркером применённой команды. */
+/** Stage 7 plan action: command, file or a record with the applied command marker. */
 interface PostInstallAction {
   description: string;
   argv?: string[];
   file?: { path: string; content: string; mode?: string };
-  /** Команда профиля, помечается применённой после успеха (идемпотентность). */
+  /** Profile command, marked as applied after success (idempotency). */
   commandKey?: string;
-  /** Ошибка не прерывает установку (optional-команды профилей). */
+  /** A failure does not interrupt the installation (optional profile commands). */
   optional?: boolean;
   timeoutMs?: number;
 }
 
-/** Загружает и резолвит выбранные профили; при ошибке — понятный отказ. */
+/** Loads and resolves the selected profiles; on error — a clear refusal. */
 async function resolveSelected(dir: string, names: string[]): Promise<MergedProfiles> {
   if (names.length === 0) return { packages: [], services: [], commands: [], files: [] };
   let profiles: Map<string, Profile>;
   try {
-    // P8.1: в LiveCD каталог profiles/ может отсутствовать — берём встроенные.
+    // P8.1: the profiles/ directory may be absent in the LiveCD — use the embedded ones.
     profiles = await loadProfilesOrDefault(dir);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Не удалось загрузить профили из ${dir}: ${message}`);
+    throw new Error(`Failed to load profiles from ${dir}: ${message}`);
   }
   try {
     return resolveProfiles(names, profiles);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`Ошибка разрешения профилей: ${message}`);
+    throw new Error(`Failed to resolve profiles: ${message}`);
   }
 }
 
-/** План этапа 7: пакеты → сервисы → файлы → команды → очистка. */
+/** Stage 7 plan: packages → services → files → commands → cleanup. */
 async function buildPlan(merged: MergedProfiles): Promise<PostInstallAction[]> {
   const applied = await readAppliedCommands();
   const pending = pendingCommands(merged.commands, applied);
@@ -58,7 +58,7 @@ async function buildPlan(merged: MergedProfiles): Promise<PostInstallAction[]> {
     ...(await planProfileServices(merged)),
     ...(await planProfileFiles(merged)),
     ...pending.map((command) => ({
-      description: command.description ?? `Команда профиля: ${command.cmd}`,
+      description: command.description ?? `Profile command: ${command.cmd}`,
       argv: inChroot(["sh", "-c", command.cmd]),
       commandKey: command.cmd,
       optional: command.optional ?? false,
@@ -67,7 +67,7 @@ async function buildPlan(merged: MergedProfiles): Promise<PostInstallAction[]> {
   ];
 }
 
-/** Печатает план (dry-run, ничего не выполняется). */
+/** Prints the plan (dry-run, nothing executes). */
 function printPlan(plan: PostInstallAction[]): void {
   for (const action of plan) {
     if (action.argv) {
@@ -78,7 +78,7 @@ function printPlan(plan: PostInstallAction[]): void {
   }
 }
 
-/** Выполняет одно действие; optional-ошибки превращаются в предупреждения. */
+/** Runs one action; optional failures become warnings. */
 async function runAction(action: PostInstallAction): Promise<void> {
   if (action.argv) {
     const result = await runLong(action.argv, {
@@ -87,7 +87,7 @@ async function runAction(action: PostInstallAction): Promise<void> {
       allowFailure: action.optional,
     });
     if (action.optional && result.code !== 0) {
-      log.warn(`Пропущено (optional): ${action.description} — код ${result.code}`);
+      log.warn(`Skipped (optional): ${action.description} — code ${result.code}`);
       return;
     }
   } else if (action.file) {
@@ -99,13 +99,13 @@ async function runAction(action: PostInstallAction): Promise<void> {
 }
 
 /**
- * Этап 7: применение профилей (пакеты, сервисы, команды в chroot, файлы с префиксом
- * целевого корня), очистка apt и временных файлов. Все под-шаги идемпотентны:
- * повторный вход поверх готовой системы пропускает выполненное (P7.2).
+ * Stage 7: applying profiles (packages, services, commands in chroot, files with
+ * the target root prefix), cleaning apt and temp files. All sub-steps are idempotent:
+ * re-entering over a ready system skips what was done (P7.2).
  */
 export const postInstallStage: InstallStage = {
   id: "postinstall",
-  title: "Пост-установка",
+  title: "Post-install",
   async run(ctx: InstallContext): Promise<void> {
     const { config, interactive, profilesDir } = ctx;
 
@@ -113,26 +113,26 @@ export const postInstallStage: InstallStage = {
     const plan = await buildPlan(merged);
 
     if (plan.length === 0) {
-      log.info("Пост-установка не требуется — профили уже применены.");
+      log.info("Post-install not required — profiles already applied.");
       return;
     }
 
-    log.info("План (dry-run):");
+    log.info("Plan (dry-run):");
     printPlan(plan);
 
     if (interactive) {
       const confirmed = await confirm({
-        message: "Применить профили и выполнить очистку?",
+        message: "Apply profiles and clean up?",
         initialValue: true,
       });
       if (!confirmed)
-        throw new CancelledError("Установка отменена: пост-установка не подтверждена");
+        throw new CancelledError("Installation cancelled: post-install not confirmed");
     }
 
     for (const action of plan) {
       await runAction(action);
     }
 
-    log.success("Профили применены, система очищена");
+    log.success("Profiles applied, system cleaned");
   },
 };

@@ -1,4 +1,4 @@
-/** Версия схемы конфигурации. Меняется при несовместимых правках формата. */
+/** Configuration schema version. Changes on incompatible format edits. */
 export const CONFIG_VERSION = 1;
 
 export type Firmware = "uefi" | "bios";
@@ -6,60 +6,60 @@ export type Filesystem = "btrfs" | "ext4";
 export type DiskLayout = "auto" | "manual" | "keep";
 
 export interface DiskConfig {
-  /** Путь к устройству, например /dev/sda. */
+  /** Device path, e.g. /dev/sda. */
   device: string;
   layout: DiskLayout;
   filesystem: Filesystem;
-  /** Создавать swap-раздел. */
+  /** Create a swap partition. */
   swap: boolean;
-  /** Размер swap в GiB (если swap включён). */
+  /** Swap size in GiB (if swap is enabled). */
   swapSizeGiB: number;
-  /** Размер ESP в GiB (схемы auto/manual, UEFI). */
+  /** ESP size in GiB (auto/manual layouts, UEFI). */
   espSizeGiB: number;
-  /** Создавать subvolumes btrfs (@, @home, @snapshots). */
+  /** Create btrfs subvolumes (@, @home, @snapshots). */
   btrfsSubvolumes: boolean;
-  /** keep: существующий раздел для /. */
+  /** keep: existing partition for /. */
   rootPartition?: string;
-  /** keep: ФС раздела root — для subvol=@ при btrfs. */
+  /** keep: root partition FS — for subvol=@ with btrfs. */
   rootPartitionFstype?: string;
-  /** keep: существующий раздел ESP (UEFI). */
+  /** keep: existing ESP partition (UEFI). */
   espPartition?: string;
-  /** keep: существующий раздел подкачки. */
+  /** keep: existing swap partition. */
   swapPartition?: string;
 }
 
 export interface UserConfig {
   username: string;
-  /** Пароль в открытом виде — только в памяти, в файл не пишется. */
+  /** Plaintext password — memory only, never written to a file. */
   password?: string;
-  /** Хеш пароля (sha512-crypt) — то, что попадает в конфиг. */
+  /** Password hash (sha512-crypt) — what goes into the config. */
   passwordHash?: string;
   fullName?: string;
-  /** Добавить в группу sudo. */
+  /** Add to the sudo group. */
   sudo: boolean;
-  /** Публичные SSH-ключи для ~/.ssh/authorized_keys. */
+  /** Public SSH keys for ~/.ssh/authorized_keys. */
   sshKeys: string[];
 }
 
 export interface NetworkConfig {
-  /** Менеджер сети в целевой системе. */
+  /** Network manager in the target system. */
   manager: "networkmanager" | "systemd-networkd" | "none";
   hostname: string;
 }
 
 export interface LocaleConfig {
-  /** Локаль, например ru_RU.UTF-8. */
+  /** Locale, e.g. en_US.UTF-8. */
   locale: string;
-  /** Раскладка консоли, например us,ru. */
+  /** Console layout, e.g. us or us,ru. */
   keymap: string;
-  /** Часовой пояс, например Europe/Moscow. */
+  /** Time zone, e.g. Europe/Moscow. */
   timezone: string;
 }
 
 export interface BootloaderConfig {
-  /** Загрузчик целевой системы. */
+  /** Target system bootloader. */
   type: "grub";
-  /** Устанавливать os-prober для поиска других ОС. */
+  /** Install os-prober to detect other OSes. */
   osProber: boolean;
 }
 
@@ -68,15 +68,15 @@ export interface InstallConfig {
   disk: DiskConfig;
   locale: LocaleConfig;
   network: NetworkConfig;
-  /** Хеш пароля root (sha512-crypt). */
+  /** Root password hash (sha512-crypt). */
   rootPasswordHash?: string;
   users: UserConfig[];
-  /** Имена выбранных профилей (см. profiles/). */
+  /** Names of the selected profiles (see profiles/). */
   profiles: string[];
   bootloader: BootloaderConfig;
-  /** Зеркало Debian для debootstrap/apt. */
+  /** Debian mirror for debootstrap/apt. */
   mirror: string;
-  /** Выполнять установку без подтверждений (авторежим). */
+  /** Run the installation without confirmations (unattended mode). */
   unattended: boolean;
 }
 
@@ -105,7 +105,7 @@ export function defaultConfig(): InstallConfig {
     profiles: [],
     bootloader: {
       type: "grub",
-      // По умолчанию выключен: медленный и чувствителен к EFI-переменным (P6.2).
+      // Disabled by default: slow and sensitive to EFI variables (P6.2).
       osProber: false,
     },
     mirror: "http://deb.debian.org/debian",

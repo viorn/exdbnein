@@ -5,11 +5,11 @@ import { hashPassword } from "../utils/password.ts";
 
 export const usersStep: Step = {
   id: "users",
-  title: "Пользователи",
+  title: "Users",
   async run({ config }): Promise<StepResult> {
     const rootPassword = await password({
-      message: "Пароль root",
-      validate: (value) => (value && value.length >= 4 ? undefined : "Минимум 4 символа"),
+      message: "Root password",
+      validate: (value) => (value && value.length >= 4 ? undefined : "At least 4 characters"),
     });
 
     const users: UserConfig[] = [];
@@ -17,22 +17,22 @@ export const usersStep: Step = {
 
     while (more) {
       const username = await text({
-        message: "Имя пользователя",
+        message: "Username",
         validate: (value) => {
-          if (!value) return "Укажите имя";
-          if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(value)) return "Некорректное имя";
-          if (users.some((u) => u.username === value)) return "Уже добавлен";
+          if (!value) return "Provide a name";
+          if (!/^[a-z_][a-z0-9_-]{0,31}$/.test(value)) return "Invalid name";
+          if (users.some((u) => u.username === value)) return "Already added";
           return undefined;
         },
       });
 
       const userPassword = await password({
-        message: `Пароль для ${username}`,
-        validate: (value) => (value && value.length >= 4 ? undefined : "Минимум 4 символа"),
+        message: `Password for ${username}`,
+        validate: (value) => (value && value.length >= 4 ? undefined : "At least 4 characters"),
       });
 
       const sudo = await confirm({
-        message: `Добавить ${username} в группу sudo?`,
+        message: `Add ${username} to the sudo group?`,
         initialValue: true,
       });
 
@@ -44,13 +44,13 @@ export const usersStep: Step = {
       });
 
       const result = await confirm({
-        message: "Добавить ещё пользователя?",
+        message: "Add another user?",
         initialValue: false,
       });
 
       if (!result) {
         const back = await confirm({
-          message: "Вернуться к предыдущему шагу?",
+          message: "Go back to the previous step?",
           initialValue: false,
         });
         if (back) return { type: "back" };
