@@ -301,15 +301,60 @@ run_firmware() {
     return 1
   fi
 
-  # Verification: hostname, root filesystem + btrfs subvolume, base profile
-  # (openssh-server from the `base` profile) and the installation log.
+  # Verification: hostname, root filesystem + btrfs subvolumes, disk layout,
+  # user accounts, base profile (openssh-server) and the installation log.
   local check='set -e
+
+    # --- Hostname ---
     test "$(hostname)" = "exdbnein-test" || { echo "BAD hostname: $(hostname)"; exit 1; }
+
+    # --- Root filesystem & btrfs subvolumes ---
     fs=$(findmnt -no FSTYPE /)
     [ "$fs" = "btrfs" ] || { echo "BAD root fs: $fs"; exit 1; }
     findmnt -no OPTIONS / | grep -q "subvol=/@" || { echo "BAD root subvol"; exit 1; }
+
+    # btrfs subvolumes: @, @home, @snapshots
+    for subvol in @ @home @snapshots; do
+      btrfs subvolume list / 2>/dev/null | grep -q "subvolid.*path=${subvol}$" \
+        || { echo "MISSING subvolume: $subvol"; exit 1; }
+    done
+
+    # Check @home is actually mounted
+    findmnt -no FSTYPE /home | grep -q "btrfs" || { echo "BAD /home fs"; exit 1; }
+    findmnt -no OPTIONS /home | grep -q "subvol=/@home" || { echo "BAD /home subvol"; exit 1; }
+
+    # --- Disk layout ---
+    # /dev/sda should exist and be a disk (not a partition)
+    test -b /dev/sda || { echo "/dev/sda not found"; exit 1; }
+
+    # Partition table type: GPT for UEFI, MBR for BIOS
+    # Check for ESP partition (vfat, ~512MB) — present in both modes
+    local esp_dev
+    esp_dev=$(findmnt -no SOURCE /boot/efi 2>/dev/null || true)
+    if [ -n "$esp_dev" ]; then
+      local esp_fs
+      esp_fs=$(findmnt -no FSTYPE /boot/efi)
+      [ "$esp_fs" = "vfat" ] || { echo "BAD esp fs: $esp_fs"; exit 1; }
+    fi
+
+    # Swap should be active
+    swapon --show=name | grep -q swap || { echo "SWAP not active"; exit 1; }
+
+    # --- Users ---
+    # root exists
+    id root >/dev/null 2>&1 || { echo "root missing"; exit 1; }
+
+    # tester user exists with home directory
+    id tester >/dev/null 2>&1 || { echo "tester user missing"; exit 1; }
+    test -d /home/tester || { echo "/home/tester missing"; exit 1; }
+    test -d /home/tester/.ssh || { echo "/home/tester/.ssh missing"; exit 1; }
+
+    # --- Services & packages ---
     systemctl is-active --quiet ssh || { echo "BAD ssh service"; exit 1; }
+
+    # --- Installation log ---
     [ -f /var/log/exdbnein/install.log ] || { echo "BAD install log"; exit 1; }
+
     echo "VERIFY_OK"'
   local verified=0 attempt
   for attempt in 1 2 3; do
