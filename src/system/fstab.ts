@@ -164,3 +164,39 @@ export async function generateFstab(root = TARGET_ROOT): Promise<string> {
   const blkid = await exec(["blkid", "-o", "export"]);
   return buildFstab(findmnt.stdout, swaps, blkid.stdout, root);
 }
+
+/** Mount points declared in an existing fstab (second field of non-comment lines). */
+export function parseFstabMountpoints(content: string): string[] {
+  const mountpoints: string[] = [];
+  for (const raw of content.split("\n")) {
+    const line = raw.trim();
+    if (!line || line.startsWith("#")) continue;
+    const fields = line.split(/\s+/);
+    const mountpoint = fields[1];
+    if (fields.length >= 2 && mountpoint) mountpoints.push(mountpoint);
+  }
+  return mountpoints;
+}
+
+/** Pure: real mount points of the target root that the existing fstab does not cover. */
+export function missingFstabMountpoints(content: string, mounted: readonly string[]): string[] {
+  const configured = new Set(parseFstabMountpoints(content));
+  return mounted.filter((mountpoint) => !configured.has(mountpoint));
+}
+
+/**
+ * Whether the existing /etc/fstab already covers all real filesystems currently
+ * mounted in the target root. A partial run (e.g. @home mounted only after a
+ * recovery) leaves fstab without /home — then it must be regenerated.
+ */
+export async function fstabCoversCurrentMounts(root = TARGET_ROOT): Promise<boolean> {
+  const content = await Bun.file(`${root}/etc/fstab`)
+    .text()
+    .catch(() => "");
+  if (!content.trim()) return false;
+  const findmnt = await exec(["findmnt", "-R", "-J", "-o", FINDMNT_COLUMNS, root]);
+  const mounted = realEntries(parseFindmnt(findmnt.stdout), root).map((entry) =>
+    targetToMountpoint(entry.target, root),
+  );
+  return missingFstabMountpoints(content, mounted).length === 0;
+}

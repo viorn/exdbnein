@@ -1,9 +1,10 @@
 import { log, spinner } from "@clack/prompts";
 import {
   type CommandPhase,
-  isDiskPrepared,
+  diskPreparationState,
   type PlannedCommand,
   planPartitionCommands,
+  recoverSubvolumeMounts,
 } from "../system/disks.ts";
 import { detectFirmware } from "../system/environment.ts";
 import { exec } from "../system/exec.ts";
@@ -60,9 +61,37 @@ export const prepareDiskStage: InstallStage = {
     const { config, interactive } = ctx;
     const device = config.disk.device;
 
+    const state = await diskPreparationState(config);
+
     // Idempotency: re-entering over an already partitioned disk does not wipe it.
-    if (await isDiskPrepared(device)) {
+    if (state === "ready") {
       log.info(`Disk ${device} is already partitioned and mounted in /mnt — partitioning skipped.`);
+      return;
+    }
+
+    // Partial preparation (root mounted, subvolumes missing): restore the mounts
+    // instead of re-partitioning — the disk already holds data.
+    if (state === "partial") {
+      const recovery = await recoverSubvolumeMounts(config);
+      if (recovery.length === 0) {
+        log.info(`Disk ${device} is already mounted in /mnt — partitioning skipped.`);
+        return;
+      }
+      log.warn(`Disk ${device} is partially prepared: missing subvolume mounts.`);
+      log.info("Command plan (dry-run):");
+      printPlan(recovery);
+
+      if (interactive) {
+        const confirmed = await confirm({
+          message: `Mount the missing btrfs subvolumes of ${device}?`,
+          initialValue: true,
+        });
+        if (!confirmed)
+          throw new CancelledError("Installation cancelled: subvolume recovery not confirmed");
+      }
+
+      await runCommands(recovery, "Mounting btrfs subvolumes...");
+      log.success("Subvolume mounts restored");
       return;
     }
 

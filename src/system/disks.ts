@@ -1,4 +1,5 @@
 import type { DiskConfig, Filesystem, InstallConfig } from "../config/types.ts";
+import { isMounted, TARGET_ROOT } from "./chroot.ts";
 import type { Firmware } from "./environment.ts";
 import { exec } from "./exec.ts";
 
@@ -232,10 +233,156 @@ export async function listPartitions(device: string): Promise<PartitionInfo[]> {
   return parseLsblkPartitions(result.stdout);
 }
 
-/** The disk is already prepared if any of its partitions is mounted in /mnt. */
-export async function isDiskPrepared(device: string): Promise<boolean> {
-  const partitions = await listPartitions(device);
-  return partitions.some((partition) => partition.mountpoints.includes("/mnt"));
+// ---- Disk preparation state (idempotency + partial recovery) -------------------
+
+/** Expected btrfs subvolumes and their mount points inside the target root. */
+export const BTRFS_SUBVOLUME_MOUNTS = [
+  { subvolume: "@home", mountpoint: "/home" },
+  { subvolume: "@snapshots", mountpoint: "/.snapshots" },
+] as const;
+
+/**
+ * Whether the config expects the @/@home/@snapshots btrfs subvolume scheme.
+ * For the keep layout the filesystem type comes from the selected partition.
+ */
+export function wantsBtrfsSubvolumes(config: InstallConfig): boolean {
+  if (!config.disk.btrfsSubvolumes) return false;
+  if (config.disk.layout === "keep") return config.disk.rootPartitionFstype === "btrfs";
+  return config.disk.filesystem === "btrfs";
+}
+
+export type DiskPreparationState = "none" | "partial" | "ready";
+
+/**
+ * Pure decision on the disk state: "none" — the root is not mounted, "partial" —
+ * the root is mounted but expected subvolumes are missing, "ready" — everything is
+ * in place. The partial state must never be treated as "none": re-partitioning
+ * would destroy the disk.
+ */
+export function diskPreparationStateFrom(
+  rootMounted: boolean,
+  subvolumesExpected: boolean,
+  missingSubvolumes: readonly string[],
+): DiskPreparationState {
+  if (!rootMounted) return "none";
+  if (!subvolumesExpected) return "ready";
+  return missingSubvolumes.length === 0 ? "ready" : "partial";
+}
+
+/** Expected subvolumes that are not mounted inside the target root yet. */
+export async function missingSubvolumeMounts(root = TARGET_ROOT): Promise<string[]> {
+  const missing: string[] = [];
+  for (const { subvolume, mountpoint } of BTRFS_SUBVOLUME_MOUNTS) {
+    if (!(await isMounted(`${root}${mountpoint}`))) missing.push(subvolume);
+  }
+  return missing;
+}
+
+/**
+ * Current state of disk preparation. The old check only looked at the root mount;
+ * a partially prepared disk (root mounted, @home/@snapshots missing) was mistaken
+ * for a ready one and the subvolumes were never restored.
+ */
+export async function diskPreparationState(config: InstallConfig): Promise<DiskPreparationState> {
+  const partitions = await listPartitions(config.disk.device);
+  const rootMounted = partitions.some((partition) => partition.mountpoints.includes(TARGET_ROOT));
+  const expected = wantsBtrfsSubvolumes(config);
+  const missing = expected ? await missingSubvolumeMounts() : [];
+  return diskPreparationStateFrom(rootMounted, expected, missing);
+}
+
+/** The disk is fully prepared: the root and all expected subvolumes are mounted. */
+export async function isDiskPrepared(config: InstallConfig): Promise<boolean> {
+  return (await diskPreparationState(config)) === "ready";
+}
+
+/**
+ * Strips the btrfs subvolume suffix from a findmnt SOURCE value:
+ * `/dev/sda3[/@]` → `/dev/sda3`. Without this the recovery mount would get an
+ * invalid source.
+ */
+export function deviceFromSource(source: string): string {
+  return source.replace(/\[.*?\]\s*$/, "").trim();
+}
+
+/** Device currently mounted at the target root (`findmnt -o SOURCE`), or null. */
+export async function mountedRootSource(root = TARGET_ROOT): Promise<string | null> {
+  const result = await exec(["findmnt", "-n", "-o", "SOURCE", root], { allowFailure: true });
+  if (result.code !== 0) return null;
+  const source = deviceFromSource(result.stdout);
+  return source || null;
+}
+
+/** Pure: mount commands for the given btrfs subvolumes from a source device. */
+export function subvolumeMountCommands(
+  source: string,
+  subvolumes: readonly string[],
+  root = TARGET_ROOT,
+): PlannedCommand[] {
+  const commands: PlannedCommand[] = [];
+  for (const { subvolume, mountpoint } of BTRFS_SUBVOLUME_MOUNTS) {
+    if (!subvolumes.includes(subvolume)) continue;
+    const target = `${root}${mountpoint}`;
+    commands.push({
+      phase: "mount",
+      description: `Create directory ${target}`,
+      argv: ["mkdir", "-p", target],
+    });
+    commands.push({
+      phase: "mount",
+      description: `Mount ${subvolume} into ${target}`,
+      argv: ["mount", "-o", `subvol=${subvolume},compress=zstd,noatime`, source, target],
+    });
+  }
+  return commands;
+}
+
+/**
+ * Checks that the expected btrfs subvolumes actually exist on the source device.
+ * Returns the list of subvolumes that are missing from the filesystem.
+ */
+export async function missingSubvolumesOnDisk(
+  device: string,
+  expected: readonly string[],
+): Promise<string[]> {
+  const result = await exec(["btrfs", "subvolume", "list", "-q", device], { allowFailure: true });
+  if (result.code !== 0) {
+    // btrfs-progs not available or device is not btrfs — cannot verify.
+    return [...expected];
+  }
+  // Each line starts with a numeric ID, then a dot, then the name.
+  const existing = new Set<string>();
+  const subvolLineRe = /^\d+\t\./;
+  for (const line of result.stdout.split("\n")) {
+    if (subvolLineRe.test(line)) {
+      const name = line.split("\t")[1]?.trim();
+      if (name) existing.add(name);
+    }
+  }
+  return expected.filter((subvolume) => !existing.has(subvolume));
+}
+
+/**
+ * Recovery of a partially prepared disk: mounts the expected @home/@snapshots
+ * subvolumes if they are missing. Used instead of a full re-partition, which would
+ * wipe data that is already on the disk.
+ */
+export async function recoverSubvolumeMounts(config: InstallConfig): Promise<PlannedCommand[]> {
+  if (!wantsBtrfsSubvolumes(config)) return [];
+  const missing = await missingSubvolumeMounts();
+  if (missing.length === 0) return [];
+  const source = await mountedRootSource();
+  if (!source) return [];
+
+  // Verify subvolumes exist on the filesystem before attempting to mount.
+  const absent = await missingSubvolumesOnDisk(source, missing);
+  if (absent.length > 0) {
+    // Subvolumes are gone — recovery is impossible, return empty so the caller
+    // can fall back to a destructive re-partition (which requires confirmation).
+    return [];
+  }
+
+  return subvolumeMountCommands(source, missing);
 }
 
 /** Partitioning, formatting and mounting commands for a layout. */

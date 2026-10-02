@@ -1,7 +1,8 @@
-import { readlink } from "node:fs/promises";
+import { readlink, stat } from "node:fs/promises";
 import type { InstallConfig, UserConfig } from "../config/types.ts";
 import { aptGet, isPackageInstalled, type PlannedAction } from "./base.ts";
 import { inChroot, TARGET_ROOT } from "./chroot.ts";
+import { recoverSubvolumeMounts } from "./disks.ts";
 import type { Firmware } from "./environment.ts";
 import { exec } from "./exec.ts";
 
@@ -337,15 +338,58 @@ export async function planUserSsh(user: UserConfig): Promise<PlannedAction[]> {
   ];
 }
 
-/** Creating users and their SSH keys. */
+/** The user's home directory exists in the target system. */
+export async function homeDirectoryExists(username: string, root = TARGET_ROOT): Promise<boolean> {
+  try {
+    return (await stat(`${root}/home/${username}`)).isDirectory();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Recreates a missing home for an already existing user from /etc/skel. Runs inside
+ * the chroot so the target NSS resolves the owner — the host does not know the user.
+ * Needed when a previous run created the user while /home was not yet mounted.
+ */
+export function createHomeCommand(user: UserConfig): string[] {
+  const home = `/home/${user.username}`;
+  const script = [
+    `mkdir -p ${home}`,
+    `chmod 700 ${home}`,
+    `chown ${user.username}: ${home}`,
+    `cp -a /etc/skel/. ${home}/ 2>/dev/null || true`,
+    `chown -R ${user.username}: ${home}`,
+  ].join(" && ");
+  return inChroot(["sh", "-c", script]);
+}
+
+/**
+ * Creating users and their SSH keys. Before useradd -m the @home subvolume is
+ * ensured to be mounted: otherwise the home lands in the root subvolume and is
+ * hidden after reboot (the visible /home/<user> is missing). An existing user
+ * without a home directory gets it recreated.
+ */
 export async function planUsers(config: InstallConfig): Promise<PlannedAction[]> {
   const actions: PlannedAction[] = [];
+
+  // Recover subvolume mounts once, before processing any users.
+  const recovery = await recoverSubvolumeMounts(config);
+  for (const command of recovery) {
+    actions.push({ description: command.description, argv: command.argv });
+  }
+
   for (const user of config.users) {
     if (!user.passwordHash) continue;
     if (!(await isUserCreated(user.username))) {
       actions.push({
         description: `Create user ${user.username}`,
         argv: useraddCommand(user),
+      });
+    } else if (!(await homeDirectoryExists(user.username))) {
+      actions.push({
+        description: `Recreate home directory for ${user.username}`,
+        argv: createHomeCommand(user),
       });
     }
     actions.push(...(await planUserSsh(user)));

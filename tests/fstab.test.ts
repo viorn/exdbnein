@@ -5,8 +5,10 @@ import {
   formatFstabEntry,
   fstabDumpPass,
   fstabOptions,
+  missingFstabMountpoints,
   parseBlkidExport,
   parseFindmnt,
+  parseFstabMountpoints,
   parseSwaps,
   realEntries,
   subvolOption,
@@ -191,5 +193,43 @@ describe("buildFstab", () => {
         pass: 1,
       }),
     ).toBe("UUID=X\t/\text4\trw,relatime\t0\t1");
+  });
+});
+
+describe("parseFstabMountpoints / missingFstabMountpoints", () => {
+  test("читает второе поле, пропускает комментарии и пустые строки", () => {
+    const content = [
+      "# /etc/fstab",
+      "",
+      "UUID=X\t/\tbtrfs\trw,noatime\t0\t0",
+      "UUID=Y /home btrfs rw,noatime 0 0",
+      "# UUID=Z /opt btrfs rw,noatime 0 0",
+    ].join("\n");
+    expect(parseFstabMountpoints(content)).toEqual(["/", "/home"]);
+  });
+
+  test("непокрытые реальные точки монтирования возвращаются", () => {
+    const content = "UUID=X\t/\tbtrfs\trw,noatime,subvol=/@\t0\t0";
+    expect(missingFstabMountpoints(content, ["/", "/home"])).toEqual(["/home"]);
+    expect(missingFstabMountpoints(content, ["/"])).toEqual([]);
+  });
+
+  test("пустой fstab не покрывает ничего", () => {
+    expect(missingFstabMountpoints("", ["/"])).toEqual(["/"]);
+    expect(missingFstabMountpoints("# только комментарий\n", ["/"])).toEqual(["/"]);
+  });
+
+  test("fstab без /home не покрывает смонтированный @home", () => {
+    const mounted = realEntries(parseFindmnt(BTRFS_FINDMNT)).map((entry) =>
+      targetToMountpoint(entry.target),
+    );
+    expect(mounted).toContain("/home");
+    const partialFstab =
+      "UUID=11111111-aaaa-4b00-8f1c-111111111111\t/\tbtrfs\trw,noatime,compress=zstd,subvol=/@\t0\t0";
+    expect(missingFstabMountpoints(partialFstab, mounted)).toEqual([
+      "/home",
+      "/.snapshots",
+      "/boot/efi",
+    ]);
   });
 });

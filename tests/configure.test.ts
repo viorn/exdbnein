@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { defaultConfig } from "../src/config/types.ts";
 import {
   authorizedKeysContent,
+  createHomeCommand,
   debconfPresetsContent,
   defaultLocaleContent,
   grubDefaultsContent,
@@ -136,6 +137,23 @@ describe("пользователи (P6.3)", () => {
       "ssh-ed25519 AAA\nssh-ed25519 BBB\n",
     );
     expect(authorizedKeysContent([])).toBe("\n");
+  });
+
+  test("createHomeCommand: home из /etc/skel в chroot с владельцем-пользователем", () => {
+    const command = createHomeCommand({
+      username: "ivan",
+      passwordHash: "$6$x$y",
+      sudo: true,
+      sshKeys: [],
+    });
+    expect(command.slice(0, 3)).toEqual(["chroot", "/mnt", "sh"]);
+    expect(command).toContain("-c");
+    const script = command[command.length - 1] ?? "";
+    expect(script).toContain("mkdir -p /home/ivan");
+    expect(script).toContain("chmod 700 /home/ivan");
+    expect(script).toContain("chown ivan: /home/ivan");
+    expect(script).toContain("cp -a /etc/skel/. /home/ivan/");
+    expect(script).toContain("chown -R ivan: /home/ivan");
   });
 });
 

@@ -4,6 +4,7 @@ import type { InstallConfig } from "../config/types.ts";
 import { chrootMounts, inChroot, isMounted, TARGET_ROOT } from "./chroot.ts";
 import type { Firmware } from "./environment.ts";
 import { exec } from "./exec.ts";
+import { fstabCoversCurrentMounts } from "./fstab.ts";
 
 /** Plan action of phase B: command, file write or fstab generation. */
 export interface PlannedAction {
@@ -210,9 +211,9 @@ export async function planKernelInstall(): Promise<PlannedAction[]> {
   ];
 }
 
-/** fstab — only if it is not generated yet. */
+/** fstab — (re)generated if absent or if it does not cover the current mounts. */
 export async function planFstab(): Promise<PlannedAction[]> {
-  if (await Bun.file(`${TARGET_ROOT}/etc/fstab`).exists()) return [];
+  if (await fstabCoversCurrentMounts()) return [];
   return [
     {
       description: "Generate /etc/fstab by UUID",

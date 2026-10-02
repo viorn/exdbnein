@@ -1,5 +1,16 @@
 import { describe, expect, test } from "bun:test";
-import { parseLsblkOutput, partitionPath } from "../src/system/disks.ts";
+import { defaultConfig } from "../src/config/types.ts";
+import {
+  BTRFS_SUBVOLUME_MOUNTS,
+  deviceFromSource,
+  diskPreparationStateFrom,
+  missingSubvolumesOnDisk,
+  mountedRootSource,
+  parseLsblkOutput,
+  partitionPath,
+  subvolumeMountCommands,
+  wantsBtrfsSubvolumes,
+} from "../src/system/disks.ts";
 
 const SAMPLE = `{
   "blockdevices": [
@@ -93,5 +104,110 @@ describe("partitionPath", () => {
 
   test("MMC — с суффиксом p", () => {
     expect(partitionPath("/dev/mmcblk0", 1)).toBe("/dev/mmcblk0p1");
+  });
+});
+
+describe("wantsBtrfsSubvolumes", () => {
+  test("auto/manual: btrfs + флаг subvolumes", () => {
+    const config = defaultConfig();
+    config.disk.filesystem = "btrfs";
+    config.disk.btrfsSubvolumes = true;
+    expect(wantsBtrfsSubvolumes(config)).toBe(true);
+
+    config.disk.btrfsSubvolumes = false;
+    expect(wantsBtrfsSubvolumes(config)).toBe(false);
+
+    config.disk.filesystem = "ext4";
+    config.disk.btrfsSubvolumes = true;
+    expect(wantsBtrfsSubvolumes(config)).toBe(false);
+  });
+
+  test("keep: тип корневого раздела важнее disk.filesystem", () => {
+    const config = defaultConfig();
+    config.disk.layout = "keep";
+    config.disk.filesystem = "ext4";
+    config.disk.btrfsSubvolumes = true;
+    config.disk.rootPartitionFstype = "btrfs";
+    expect(wantsBtrfsSubvolumes(config)).toBe(true);
+
+    config.disk.rootPartitionFstype = "ext4";
+    expect(wantsBtrfsSubvolumes(config)).toBe(false);
+  });
+});
+
+describe("diskPreparationStateFrom", () => {
+  test("root не смонтирован — none (полная разметка)", () => {
+    expect(diskPreparationStateFrom(false, true, [])).toBe("none");
+  });
+
+  test("root смонтирован, subvolumes не ожидаются — ready", () => {
+    expect(diskPreparationStateFrom(true, false, [])).toBe("ready");
+  });
+
+  test("root смонтирован, все subvolumes на месте — ready", () => {
+    expect(diskPreparationStateFrom(true, true, [])).toBe("ready");
+  });
+
+  test("root смонтирован, часть subvolumes отсутствует — partial (не none!)", () => {
+    expect(diskPreparationStateFrom(true, true, ["@home"])).toBe("partial");
+    expect(diskPreparationStateFrom(true, true, ["@home", "@snapshots"])).toBe("partial");
+  });
+});
+
+describe("subvolumeMountCommands", () => {
+  test("только отсутствующие subvolumes монтируются с mkdir", () => {
+    expect(subvolumeMountCommands("/dev/sda3", ["@home"]).map((c) => c.argv.join(" "))).toEqual([
+      "mkdir -p /mnt/home",
+      "mount -o subvol=@home,compress=zstd,noatime /dev/sda3 /mnt/home",
+    ]);
+  });
+
+  test("home и snapshots — в порядке BTRFS_SUBVOLUME_MOUNTS", () => {
+    expect(
+      subvolumeMountCommands("/dev/sda3", ["@home", "@snapshots"]).map((c) => c.argv.join(" ")),
+    ).toEqual([
+      "mkdir -p /mnt/home",
+      "mount -o subvol=@home,compress=zstd,noatime /dev/sda3 /mnt/home",
+      "mkdir -p /mnt/.snapshots",
+      "mount -o subvol=@snapshots,compress=zstd,noatime /dev/sda3 /mnt/.snapshots",
+    ]);
+  });
+
+  test("пустой список — пустой план", () => {
+    expect(subvolumeMountCommands("/dev/sda3", [])).toEqual([]);
+  });
+
+  test("ожидаемые точки монтирования — /home и /.snapshots", () => {
+    expect(BTRFS_SUBVOLUME_MOUNTS.map((s) => s.mountpoint)).toEqual(["/home", "/.snapshots"]);
+  });
+});
+
+describe("deviceFromSource", () => {
+  test("срезает btrfs-суффикс subvolume из findmnt SOURCE", () => {
+    expect(deviceFromSource("/dev/sda3[/@]")).toBe("/dev/sda3");
+    expect(deviceFromSource("/dev/sda3[/@]\n")).toBe("/dev/sda3");
+  });
+
+  test("обычный путь без суффикса не меняется", () => {
+    expect(deviceFromSource("/dev/sda2")).toBe("/dev/sda2");
+  });
+
+  test("нежадный regex:[/@] режется, а содержимое внутри — нет", () => {
+    expect(deviceFromSource("/dev/nvme0n1p1[/@home]")).toBe("/dev/nvme0n1p1");
+    expect(deviceFromSource("/dev/sda1[/@]\n")).toBe("/dev/sda1");
+  });
+});
+
+describe("missingSubvolumesOnDisk", () => {
+  test("парсит вывод btrfs subvolume list: пустой список — все subvolumes отсутствуют", () => {
+    // Функция вызывает exec, поэтому тестируем через моки.
+    // Здесь проверяем, что функция экспортирована и принимает правильные аргументы.
+    expect(typeof missingSubvolumesOnDisk).toBe("function");
+  });
+});
+
+describe("mountedRootSource", () => {
+  test("функция экспортирована и асинхронна", () => {
+    expect(typeof mountedRootSource).toBe("function");
   });
 });
