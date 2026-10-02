@@ -33,15 +33,18 @@ exdbnein/
 │   └── utils/
 ├── profiles/               # встроенные YAML-профили (base, desktop, server, ...)
 ├── tests/                  # bun test
-├── livecd/                 # сборка LiveCD (ещё не создана)
-├── .github/workflows/ci.yml # CI: typecheck + lint + test
+├── livecd/                 # сборка LiveCD (этап 8): build.sh, packages.txt, overlay rootfs
+├── scripts/                # embed-profiles.ts (генератор встроенных профилей) и др.
+├── .github/workflows/ci.yml # CI: typecheck + lint + test + актуальность встроенных профилей
 ├── package.json
 ├── tsconfig.json
 ├── biome.json
 └── plan.md                 # подробный план по этапам (0–9)
 ```
 
-> **Важно:** Большинство директорий (`src/steps`, `src/config`, `src/ui`, `src/profiles`, `src/utils`, `profiles/`, `livecd/`) — пока пустые заглушки. Реализован только каркас: `src/index.ts` (демо-визард) и `src/system/exec.ts` (обёртка над spawn). Полный функционал разбит на этапы 1–9 в `plan.md`.
+> **Важно:** Этапы 1–8 реализованы (см. статус ниже). `livecd/build.sh` собирает LiveCD;
+> профили компилируются в бинарь установщика (`bun run embed:profiles` →
+> `src/profiles/embedded-data.generated.ts`, P8.1). Полный план — в `plan.md`.
 
 ## Сборка и запуск
 
@@ -73,7 +76,8 @@ bun run test           # bun test (все тесты в tests/)
 ### CI
 GitHub Actions (`.github/workflows/ci.yml`):
 - Триггер: push на `main`, pull requests.
-- Шаги: `bun install` → `typecheck` → `lint` → `test`.
+- Шаги: `bun install` → `typecheck` → `lint` → `test` → проверка актуальности
+  встроенных профилей (`embed:profiles` + `git diff --exit-code`).
 
 ## Стек технологий
 
@@ -102,26 +106,24 @@ GitHub Actions (`.github/workflows/ci.yml`):
 
 ## Текущее состояние реализации
 
-### ✅ Реализовано (Этап 0)
-- Каркас проекта: `bun init`, TypeScript strict, `@clack/prompts`
-- Скрипты `start` / `dev` / `test` / `typecheck` / `lint` / `format` / `check`
-- Биome линтер + форматтер
-- Структура каталогов `src/{steps,system,config,profiles,ui,utils}`, `profiles/`, `tests/`
-- Модуль `system/exec.ts` — обёртка над `Bun.spawn` с `ExecError`, поддержка `allowFailure`, shell-команды, `hasCommand`
-- Тесты для `exec.ts` (5 тестов)
-- CI-заготовка (GitHub Actions)
+### ✅ Реализовано (Этапы 0–8)
+- **Этап 0** — каркас проекта, `system/exec.ts`, CI-заготовка
+- **Этап 1** — ядро TUI, модель `InstallConfig`, визард, автосохранение черновика
+- **Этап 2** — YAML-профили с наследованием (`extends`), выбор в визарде
+- **Этап 3** — pre-flight (root, маркер LiveCD, `--force`), UEFI/BIOS, диски через lsblk, сеть
+- **Этап 4** — разметка диска (GPT/MBR, btrfs/ext4, subvolumes), dry-run план
+- **Этап 5** — debootstrap, chroot-монтирования, fstab по UUID
+- **Этап 6** — locale, пользователи, сеть, GRUB (BIOS+UEFI)
+- **Этап 7** — пост-установка (профили, идемпотентность, лог, размонтирование)
+- **Этап 8** — LiveCD: `livecd/build.sh` (debootstrap + `bun build --compile`),
+  профили встроены в бинарь (`scripts/embed-profiles.ts`), squashfs zstd,
+  гибридный ISO BIOS+UEFI (grub-mkrescue), автозапуск на tty1 (getty override),
+  сеть из коробки (NetworkManager + nmtui, WiFi-прошивки из non-free-firmware),
+  маркер `/etc/exdbnein-live`
 
-### 🚧 В процессе / Запланировано (Этапы 1–9)
-Полный план см. в `plan.md`. Кратко:
-- **Этап 1** — Ядро TUI, модель `InstallConfig`, визард, сохранение конфига
-- **Этап 2** — YAML-профили, наследование, выбор в визарде
-- **Этап 3** — Определение окружения (root, UEFI/BIOS, диски, сеть)
-- **Этап 4** — Разметка диска (GPT, btrfs/ext4, subvolumes)
-- **Этап 5** — Установка базовой системы (debootstrap, ядро, fstab)
-- **Этап 6** — Настройка системы (locale, hostname, пользователи, сеть, GRUB)
-- **Этап 7** — Пост-установка (профили, очистка, reboot)
-- **Этап 8** — Сборка LiveCD (build.sh, squashfs, ISO)
-- **Этап 9** — Тестирование и автоматизация (QEMU, скрипты)
+### 🚧 Запланировано (Этап 9)
+- Тестирование и автоматизация: QEMU-прогоны BIOS+UEFI, `scripts/qemu-test.sh`,
+  юнит-тесты новых модулей. Полный план — в `plan.md`.
 
 ## Формат YAML-профилей
 

@@ -1,6 +1,6 @@
 import { note } from "@clack/prompts";
 import type { Profile } from "../profiles/index.ts";
-import { loadProfiles, resolveProfiles } from "../profiles/index.ts";
+import { loadProfilesOrDefault, resolveProfiles } from "../profiles/index.ts";
 import { backOption, isBack, multiselect, select } from "../ui/prompts.ts";
 import type { Step, StepResult } from "../ui/wizard.ts";
 
@@ -16,7 +16,8 @@ export function profilesStep(options: ProfilesStepOptions): Step {
     async run({ config }): Promise<StepResult> {
       let profiles: Map<string, Profile>;
       try {
-        profiles = await loadProfiles(options.dir);
+        // P8.1: каталог profiles/ есть в dev, в LiveCD работают встроенные профили.
+        profiles = await loadProfilesOrDefault(options.dir);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         throw new Error(`Ошибка загрузки профилей: ${message}`);

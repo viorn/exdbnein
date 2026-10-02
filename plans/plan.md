@@ -99,7 +99,7 @@ exdbnein/
 | 5 | Установка базовой системы | ✅ | [phase5.md](phase5.md) |
 | 6 | Настройка системы | ✅ | [phase6.md](phase6.md) |
 | 7 | Пост-установка и завершение | ✅ | [phase7.md](phase7.md) |
-| 8 | Сборка LiveCD | ⬜ | [phase8.md](phase8.md) |
+| 8 | Сборка LiveCD | ✅ | [phase8.md](phase8.md) |
 | 9 | Тестирование и автоматизация | ⬜ | [phase9.md](phase9.md) |
 
 ## Обзор задач по этапам
@@ -161,8 +161,18 @@ GRUB (BIOS — i386-pc, UEFI — x86_64-efi + fallback EFI/BOOT/BOOTX64.EFI) с 
 Подробности — [phase7.md](phase7.md).
 
 ### Этап 8 — LiveCD
-`build.sh`: live-система + скомпилированный бинарь установщика (`bun build --compile`),
-squashfs, гибридный ISO BIOS+UEFI, автозапуск на tty1, маркер `/etc/exdbnein-live`.
+Реализован: [`livecd/build.sh`](../livecd/build.sh) — debootstrap live-root (minbase + пакеты
+из [`livecd/packages.txt`](../livecd/packages.txt)) и компиляция установщика
+`bun build --compile`. Профили встроены в бинарь (P8.1): генератор
+[`scripts/embed-profiles.ts`](../scripts/embed-profiles.ts) →
+[`src/profiles/embedded-data.generated.ts`](../src/profiles/embedded-data.generated.ts),
+рантайм-загрузчик [`loadProfilesOrDefault`](../src/profiles/embedded.ts) (каталог YAML или
+встроенные данные). squashfs zstd + initramfs live-boot + GRUB (гибрид BIOS+UEFI через
+grub-mkrescue), автозапуск на tty1 (override `getty@tty1`, P8.3), сеть из коробки
+(NetworkManager + nmtui, WiFi-прошивки из компонента `non-free-firmware`),
+live-пользователь `live`, маркер `/etc/exdbnein-live` (P8.2). Параметры сборки — окружение
+(`SUITE`, `MIRROR`, `COMPONENTS`, `ISO_NAME`, `SOURCE_DATE_EPOCH`, `KEEP_WORK`).
+Подробности — [phase8.md](phase8.md).
 
 ### Этап 9 — Тестирование
 Юнит-тесты (lsblk, fstab, профили, имена разделов), прогоны в QEMU BIOS+UEFI по

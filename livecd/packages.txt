@@ -1,0 +1,34 @@
+# Ядро и initramfs: хуки live-boot должны попасть в initrd
+linux-image-amd64
+initramfs-tools
+# Загрузка live-системы из squashfs
+live-boot
+busybox
+systemd-sysv
+# Инструменты установщика: разметка и файловые системы (этап 4)
+parted
+btrfs-progs
+dosfstools
+# Установка базовой системы в chroot (этап 5, P5.1)
+debootstrap
+debian-archive-keyring
+# Сеть из коробки: NetworkManager + TUI (nmtui) для проводных и WiFi
+network-manager
+wpasupplicant
+iw
+rfkill
+systemd-resolved
+curl
+ca-certificates
+# WiFi-прошивки (non-free-firmware): максимально возможные драйверы
+firmware-iwlwifi
+firmware-realtek
+firmware-atheros
+firmware-brcm80211
+firmware-misc-nonfree
+wireless-regdb
+# Отладка на tty2
+sudo
+vim-tiny
+# Локали для корректного UTF-8 вывода TUI
+locales

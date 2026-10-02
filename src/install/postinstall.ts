@@ -1,6 +1,6 @@
 import { log } from "@clack/prompts";
 import type { MergedProfiles, Profile } from "../profiles/index.ts";
-import { loadProfiles, resolveProfiles } from "../profiles/index.ts";
+import { loadProfilesOrDefault, resolveProfiles } from "../profiles/index.ts";
 import { writeTargetFile } from "../system/base.ts";
 import { inChroot } from "../system/chroot.ts";
 import {
@@ -34,7 +34,8 @@ async function resolveSelected(dir: string, names: string[]): Promise<MergedProf
   if (names.length === 0) return { packages: [], services: [], commands: [], files: [] };
   let profiles: Map<string, Profile>;
   try {
-    profiles = await loadProfiles(dir);
+    // P8.1: в LiveCD каталог profiles/ может отсутствовать — берём встроенные.
+    profiles = await loadProfilesOrDefault(dir);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`Не удалось загрузить профили из ${dir}: ${message}`);

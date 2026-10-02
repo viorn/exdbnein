@@ -6,7 +6,14 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["**", "!**/node_modules", "!**/dist", "!**/out", "!**/.gigacode_vsc"]
+    "includes": [
+      "**",
+      "!**/node_modules",
+      "!**/dist",
+      "!**/out",
+      "!**/.gigacode_vsc",
+      "!**/src/profiles/embedded-data.generated.ts"
+    ]
   },
   "formatter": {
     "enabled": true,

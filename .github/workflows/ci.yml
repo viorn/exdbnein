@@ -26,3 +26,8 @@ jobs:
 
       - name: Тесты
         run: bun run test
+
+      - name: Встроенные профили актуальны (P8.1)
+        run: |
+          bun run embed:profiles
+          git diff --exit-code -- src/profiles/embedded-data.generated.ts

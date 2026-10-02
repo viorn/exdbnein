@@ -11,7 +11,10 @@
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
     "format": "biome format --write .",
-    "check": "bun run typecheck && bun run lint && bun run test"
+    "check": "bun run typecheck && bun run lint && bun run test",
+    "embed:profiles": "bun run scripts/embed-profiles.ts",
+    "build:installer": "bun build --compile --minify ./src/index.ts --outfile out/exdbnein",
+    "build:live": "bash livecd/build.sh"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.5.14",

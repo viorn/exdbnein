@@ -9,6 +9,17 @@ const EMPTY_COLLECTIONS = {
   files: [],
 } as const;
 
+/** Парсит и валидирует один YAML-профиль. Бросает ошибку с описанием проблем. */
+export function parseProfile(name: string, text: string): Profile {
+  const parsed: unknown = parse(text);
+  const issues = validateProfile(name, parsed);
+  if (issues.length > 0) {
+    const list = issues.map((issue) => `• ${issue.path}: ${issue.message}`).join("\n");
+    throw new Error(`Профиль ${name} невалиден:\n${list}`);
+  }
+  return { ...EMPTY_COLLECTIONS, ...(parsed as Profile), name };
+}
+
 /**
  * Загружает профили из каталога (*.yaml, *.yml) и валидирует каждый.
  * При любой ошибке бросает исключение с указанием файла.
@@ -19,21 +30,14 @@ export async function loadProfiles(dir: string): Promise<Map<string, Profile>> {
 
   for await (const file of glob.scan({ cwd: dir, onlyFiles: true })) {
     const text = await Bun.file(`${dir}/${file}`).text();
-    const parsed: unknown = parse(text);
-    const raw = parsed as Record<string, unknown>;
+    const raw = parse(text) as Record<string, unknown>;
     const name = typeof raw?.name === "string" ? raw.name : "";
 
     if (!name) {
       throw new Error(`Профиль ${file}: отсутствует поле name`);
     }
 
-    const issues = validateProfile(name, parsed);
-    if (issues.length > 0) {
-      const list = issues.map((issue) => `• ${issue.path}: ${issue.message}`).join("\n");
-      throw new Error(`Профиль ${file} невалиден:\n${list}`);
-    }
-
-    profiles.set(name, { ...EMPTY_COLLECTIONS, ...(parsed as Profile), name });
+    profiles.set(name, parseProfile(name, text));
   }
 
   return profiles;
