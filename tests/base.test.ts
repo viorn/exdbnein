@@ -5,6 +5,8 @@ import {
   aptGet,
   DEBOOTSTRAP_SUITE,
   debootstrapCommand,
+  essentialBasePackages,
+  isBtrfsRoot,
   sourcesListContent,
 } from "../src/system/base.ts";
 import { chrootMounts, inChroot } from "../src/system/chroot.ts";
@@ -79,6 +81,30 @@ describe("chrootMounts", () => {
     for (const mount of chrootMounts("uefi")) {
       expect(mount.argv.some((arg) => arg.startsWith("/mnt/"))).toBe(true);
     }
+  });
+});
+
+describe("boot-critical packages (P5.4)", () => {
+  test("btrfs root: systemd-sysv + btrfs-progs", () => {
+    const config = defaultConfig();
+    config.disk.filesystem = "btrfs";
+    expect(essentialBasePackages(config)).toEqual(["systemd-sysv", "btrfs-progs"]);
+  });
+
+  test("ext4 root: только systemd-sysv", () => {
+    const config = defaultConfig();
+    config.disk.filesystem = "ext4";
+    expect(essentialBasePackages(config)).toEqual(["systemd-sysv"]);
+  });
+
+  test("isBtrfsRoot учитывает rootPartitionFstype при layout=keep", () => {
+    const config = defaultConfig();
+    config.disk.layout = "keep";
+    config.disk.rootPartition = "/dev/sda2";
+    config.disk.rootPartitionFstype = "btrfs";
+    expect(isBtrfsRoot(config)).toBe(true);
+    config.disk.rootPartitionFstype = "ext4";
+    expect(isBtrfsRoot(config)).toBe(false);
   });
 });
 

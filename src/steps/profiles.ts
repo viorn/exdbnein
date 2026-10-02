@@ -25,6 +25,13 @@ export function profilesStep(options: ProfilesStepOptions): Step {
 
       if (profiles.size === 0) return { type: "continue" };
 
+      let initialValues = config.profiles.filter((name) => profiles.has(name));
+      // Fresh installs start with the base profile selected — otherwise pressing Enter
+      // alone would produce a bare minbase system without sudo/SSH.
+      if (initialValues.length === 0 && profiles.has("base")) {
+        initialValues = ["base"];
+      }
+
       const selected = await multiselect({
         message: "Software sets",
         options: [...profiles.values()].map((profile) => ({
@@ -32,7 +39,7 @@ export function profilesStep(options: ProfilesStepOptions): Step {
           label: profile.name,
           hint: profile.description,
         })),
-        initialValues: config.profiles.filter((name) => profiles.has(name)),
+        initialValues,
         required: false,
       });
       config.profiles = selected;

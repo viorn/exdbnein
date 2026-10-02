@@ -102,7 +102,9 @@ export function defaultConfig(): InstallConfig {
       hostname: "debian",
     },
     users: [],
-    profiles: [],
+    // The base profile is on by default: sudo/ssh/utilities — a bare minbase system
+    // is not usable and boot-critical packages come from stage 5, not from profiles.
+    profiles: ["base"],
     bootloader: {
       type: "grub",
       // Disabled by default: slow and sensitive to EFI variables (P6.2).

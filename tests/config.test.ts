@@ -28,6 +28,10 @@ describe("defaultConfig", () => {
     expect(issues.map((i) => i.path)).toContain("disk.device");
     expect(issues.map((i) => i.path)).toContain("rootPasswordHash");
   });
+
+  test("профиль base включён по умолчанию", () => {
+    expect(defaultConfig().profiles).toEqual(["base"]);
+  });
 });
 
 describe("validateConfig", () => {

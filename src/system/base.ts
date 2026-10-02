@@ -143,6 +143,62 @@ export async function planAptUpdate(): Promise<PlannedAction[]> {
   ];
 }
 
+/** The root filesystem of the target system; the keep layout may override it. */
+export function isBtrfsRoot(config: InstallConfig): boolean {
+  if (config.disk.layout === "keep" && config.disk.rootPartitionFstype) {
+    return config.disk.rootPartitionFstype === "btrfs";
+  }
+  return config.disk.filesystem === "btrfs";
+}
+
+/**
+ * Packages without which the installed system does not boot. minbase + --no-install-recommends
+ * do not guarantee /sbin/init (systemd-sysv), and a btrfs root needs the user-space tools
+ * (fsck.btrfs/mount.btrfs) to be present BEFORE the initramfs is generated (P5.4).
+ */
+export function essentialBasePackages(config: InstallConfig): string[] {
+  const packages = ["systemd-sysv"];
+  if (isBtrfsRoot(config)) packages.push("btrfs-progs");
+  return packages;
+}
+
+/** A kernel is already installed in the target system (/boot/vmlinuz-*). */
+async function hasInstalledKernel(root = TARGET_ROOT): Promise<boolean> {
+  try {
+    const entries = await readdir(`${root}/boot`);
+    return entries.some((name) => name.startsWith("vmlinuz-"));
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Essential boot packages — installed BEFORE the kernel, so the initramfs built by the
+ * kernel postinst already contains systemd-sysv and the btrfs tools. Re-entering over a
+ * broken base (kernel present) triggers update-initramfs so the fix also heals old installs.
+ */
+export async function planEssentialPackages(config: InstallConfig): Promise<PlannedAction[]> {
+  const packages = essentialBasePackages(config);
+  const installed = await Promise.all(packages.map((pkg) => isPackageInstalled(pkg)));
+  if (installed.every(Boolean)) return [];
+
+  const actions: PlannedAction[] = [
+    {
+      description: `Install essential boot packages: ${packages.join(", ")}`,
+      argv: aptGet("install", "--no-install-recommends", ...packages),
+    },
+  ];
+  // On a fresh install the kernel step regenerates the initramfs; on a re-entry the
+  // kernel already exists and the new tools must be picked up explicitly.
+  if (await hasInstalledKernel()) {
+    actions.push({
+      description: "Rebuild initramfs (update-initramfs -u)",
+      argv: inChroot(["update-initramfs", "-u"]),
+    });
+  }
+  return actions;
+}
+
 /** Kernel and firmware — only if the kernel is not installed yet. */
 export async function planKernelInstall(): Promise<PlannedAction[]> {
   if (await isPackageInstalled("linux-image-amd64")) return [];
