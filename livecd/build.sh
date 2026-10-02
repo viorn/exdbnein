@@ -16,6 +16,9 @@
 #   ISO_NAME=exdbnein-stable.iso VOLID=EXDBNEIN_LIVE KEEP_WORK=0
 #   COMPONENTS=main,contrib,non-free-firmware (WiFi firmware lives in non-free-firmware)
 #   BUN=/path/to/bun (by default searched in PATH, ~/.bun/bin and ~/.local/bin)
+#   AUTOTEST=1 (QEMU automation, P9.1): appends `exdbnein.config=auto` to the
+#     kernel command line — the installer auto-runs from the seed volume on boot
+#     (see /opt/exdbnein/autostart.sh). Used by scripts/qemu-test.sh.
 #
 # The build requires root. Important: run `sudo bash livecd/build.sh`,
 # NOT `sudo bun run build:live` — sudo looks for bun in secure_path and does not
@@ -40,6 +43,14 @@ VOLID="${VOLID:-EXDBNEIN_LIVE}"
 KEEP_WORK="${KEEP_WORK:-0}"
 # Path to bun; if not set — searched in resolve_bun().
 BUN="${BUN:-}"
+# QEMU automation mode (P9.1): the ISO boots straight into an unattended install.
+AUTOTEST="${AUTOTEST:-0}"
+# Kernel command line of the ISO (serial console is always on for debugging);
+# `exdbnein.config=auto` enables the automated installer on boot (P9.1).
+KERNEL_PARAMS="boot=live quiet console=ttyS0,115200"
+if [[ "$AUTOTEST" == "1" ]]; then
+  KERNEL_PARAMS="$KERNEL_PARAMS exdbnein.config=auto"
+fi
 # For reproducible builds (grub-mkrescue reads SOURCE_DATE_EPOCH).
 SOURCE_DATE_EPOCH="${SOURCE_DATE_EPOCH:-$(git -C "$REPO_ROOT" log -1 --format=%ct 2>/dev/null || date +%s)}"
 
@@ -205,8 +216,11 @@ stage_customize() {
   install -m 0755 "$WORK/exdbnein" "$LIVE_ROOT/opt/exdbnein/exdbnein"
   cp -a "$REPO_ROOT"/profiles/*.yaml "$LIVE_ROOT/opt/exdbnein/profiles/"
 
-  # Overlay: auto-start on tty1 (P8.3).
+  # Overlay: auto-start on tty1 (P8.3) + automated mode wrapper (P9.1).
   cp -a "$OVERLAY/." "$LIVE_ROOT/"
+  # Git does not track the executable bit reliably through every checkout —
+  # the wrapper runs from a systemd unit, so make sure it can execute.
+  chmod +x "$LIVE_ROOT/opt/exdbnein/autostart.sh"
 
   # Actions inside chroot — in a subshell with trap, so pseudo-FS get unmounted
   # even on error (similar to P7.3).
@@ -224,8 +238,9 @@ stage_customize() {
     chroot "$LIVE_ROOT" chmod 440 /etc/sudoers.d/live
 
     # Services: NetworkManager (wired + WiFi, nmtui), resolved for DNS,
-    # tty2 for debugging (tty1 is taken by the installer).
-    chroot "$LIVE_ROOT" systemctl enable NetworkManager.service systemd-resolved.service getty@tty2.service
+    # tty2 for debugging (tty1 is taken by the installer), serial console for
+    # QEMU automation and headless debugging (P9.1).
+    chroot "$LIVE_ROOT" systemctl enable NetworkManager.service systemd-resolved.service getty@tty2.service serial-getty@ttyS0.service
 
     # initramfs is rebuilt to include live-boot hooks.
     chroot "$LIVE_ROOT" update-initramfs -u -k all
@@ -263,7 +278,11 @@ stage_boot_files() {
   mkdir -p "$ISO_ROOT/live" "$ISO_ROOT/boot/grub"
   install -m 0644 "$kernel" "$ISO_ROOT/live/vmlinuz"
   install -m 0644 "$initrd" "$ISO_ROOT/live/initrd.img"
-  cp "$GRUB_CFG" "$ISO_ROOT/boot/grub/grub.cfg"
+
+  # grub.cfg is a template: the kernel command line is injected here so the same
+  # source works for the interactive ISO and the AUTOTEST one (P9.1).
+  sed "s|@KERNEL_PARAMS@|$KERNEL_PARAMS|g" "$GRUB_CFG" > "$ISO_ROOT/boot/grub/grub.cfg"
+  info "Kernel params: $KERNEL_PARAMS"
 }
 
 # --- 6. Hybrid ISO (BIOS+UEFI) -------------------------------------------------

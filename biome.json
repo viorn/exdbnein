@@ -12,6 +12,7 @@
       "!**/dist",
       "!**/out",
       "!**/.gigacode_vsc",
+      "!**/.worktrees",
       "!**/src/profiles/embedded-data.generated.ts"
     ]
   },

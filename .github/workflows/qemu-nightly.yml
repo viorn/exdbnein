@@ -1,0 +1,54 @@
+# QEMU end-to-end tests (phase 9, P9.3).
+#
+# Runs nightly and on demand (workflow_dispatch) — NOT part of the PR check,
+# so that reviews stay fast. Verifies the full cycle in QEMU for BIOS and UEFI:
+# ISO → unattended install → reboot → SSH verification (scripts/qemu-test.sh).
+
+name: QEMU e2e (nightly)
+
+on:
+  schedule:
+    # 03:17 UTC daily
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+jobs:
+  qemu:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Установка зависимостей
+        run: bun install --frozen-lockfile
+
+      - name: Установка системных пакетов (QEMU, OVMF, сборка ISO)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            qemu-system-x86 \
+            ovmf \
+            mtools \
+            debootstrap \
+            debian-archive-keyring \
+            squashfs-tools \
+            xorriso \
+            grub-pc-bin \
+            grub-efi-amd64-bin \
+            dosfstools \
+            openssh-client
+
+      - name: QEMU e2e — BIOS + UEFI
+        run: scripts/qemu-test.sh
+
+      - name: Логи установки (при провале)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qemu-logs
+          path: out/qemu/**/*.log
+          if-no-files-found: ignore

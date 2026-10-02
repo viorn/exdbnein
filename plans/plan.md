@@ -100,7 +100,7 @@ exdbnein/
 | 6 | Настройка системы | ✅ | [phase6.md](phase6.md) |
 | 7 | Пост-установка и завершение | ✅ | [phase7.md](phase7.md) |
 | 8 | Сборка LiveCD | ✅ | [phase8.md](phase8.md) |
-| 9 | Тестирование и автоматизация | ⬜ | [phase9.md](phase9.md) |
+| 9 | Тестирование и автоматизация | ✅ | [phase9.md](phase9.md) |
 
 ## Обзор задач по этапам
 
@@ -175,8 +175,13 @@ live-пользователь `live`, маркер `/etc/exdbnein-live` (P8.2). 
 Подробности — [phase8.md](phase8.md).
 
 ### Этап 9 — Тестирование
-Юнит-тесты (lsblk, fstab, профили, имена разделов), прогоны в QEMU BIOS+UEFI по
-`--unattended` конфигу, `scripts/qemu-test.sh`, документация.
+Реализован: юнит-тесты (lsblk, fstab, профили, имена разделов) уже были зелёными;
+QEMU-автоматизация (`--unattended` + seed-том + cmdline `exdbnein.config=auto`,
+serial console ttyS0) через [`scripts/qemu-test.sh`](../scripts/qemu-test.sh)
+(BIOS и UEFI: установка → reboot → проверка по SSH), ночной CI-job
+[`.github/workflows/qemu-nightly.yml`](../.github/workflows/qemu-nightly.yml),
+README со сборкой ISO, запуском установщика и авторежимом.
+Подробности — [phase9.md](phase9.md).
 
 ## Навигация по документам
 

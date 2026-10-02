@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "disk": {
+    "device": "/dev/sda",
+    "layout": "auto",
+    "filesystem": "btrfs",
+    "swap": true,
+    "swapSizeGiB": 1,
+    "espSizeGiB": 0.5,
+    "btrfsSubvolumes": true
+  },
+  "locale": {
+    "locale": "en_US.UTF-8",
+    "keymap": "us",
+    "timezone": "UTC"
+  },
+  "network": {
+    "manager": "networkmanager",
+    "hostname": "exdbnein-test"
+  },
+  "rootPasswordHash": "$6$KeL1QCO/dctPK35h$bndHi9EMqt4MDkXwpXNPp5sjdCnPSqC1lbBZdH8qzZ4PHnygv2A0O8oIZ.xyarQZ6.7pirF6BX2ZLNCaB.Guf.",
+  "users": [
+    {
+      "username": "tester",
+      "passwordHash": "$6$eHC.5Am7OcHrfG2Q$Pi8cTUzLXPW3sgceh7ag14oFrvHJ30HKyKly/y403YmMNACbIlDYAISziiwFVfRoTpBsJqO7EceTDwiMOAW9P.",
+      "fullName": "QEMU test user",
+      "sudo": true,
+      "sshKeys": ["@@PUBKEY@@"]
+    }
+  ],
+  "profiles": ["base"],
+  "bootloader": {
+    "type": "grub",
+    "osProber": false
+  },
+  "mirror": "http://deb.debian.org/debian",
+  "unattended": true
+}
