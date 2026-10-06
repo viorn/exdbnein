@@ -1,6 +1,7 @@
 import { log, spinner } from "@clack/prompts";
 import {
   type CommandPhase,
+  checkPlanTools,
   diskPreparationState,
   type PlannedCommand,
   planPartitionCommands,
@@ -97,6 +98,20 @@ export const prepareDiskStage: InstallStage = {
 
     const firmware = await detectFirmware();
     const commands = planPartitionCommands(config, firmware);
+
+    // Fail fast BEFORE the destructive confirmation: without the fs tools the
+    // plan would abort right after wiping the disk. E.g. mkfs.ext4 is provided
+    // by e2fsprogs, which was missing from the LiveCD (btrfs worked — btrfs-progs
+    // was there, ext4 crashed on the first formatting command).
+    const missingTools = await checkPlanTools(commands);
+    if (missingTools.length > 0) {
+      throw new Error(
+        `Required filesystem tools are missing in the LiveCD: ${missingTools.join(", ")}. ` +
+          "Add the corresponding packages to livecd/packages.txt " +
+          "(e.g. e2fsprogs provides mkfs.ext4) and rebuild the ISO.",
+      );
+    }
+
     const destructive = isDestructive(commands);
 
     if (destructive) {

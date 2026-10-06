@@ -10,6 +10,7 @@ systemd-sysv
 parted
 btrfs-progs
 dosfstools
+e2fsprogs
 # Base system installation into chroot (stage 5, P5.1)
 debootstrap
 debian-archive-keyring

@@ -2,7 +2,7 @@ import type { DiskConfig, Filesystem, InstallConfig } from "../config/types.ts";
 import { isMounted, TARGET_ROOT } from "./chroot.ts";
 import type { Firmware } from "./environment.ts";
 import { isLiveEnvironment } from "./environment.ts";
-import { exec } from "./exec.ts";
+import { exec, hasCommand } from "./exec.ts";
 
 /** Disk information from lsblk. */
 export interface DiskInfo {
@@ -606,4 +606,37 @@ export function keepMountCommands(disk: DiskConfig): PlannedCommand[] {
 export function planPartitionCommands(config: InstallConfig, firmware: Firmware): PlannedCommand[] {
   if (config.disk.layout === "keep") return keepMountCommands(config.disk);
   return layoutCommands(config.disk.device, buildPartitionLayout(config.disk, firmware));
+}
+
+// ---- Fail-fast tool preflight ------------------------------------------------
+
+/** External binaries required by the partition/format phases of the plan. */
+function planToolBinaries(commands: PlannedCommand[]): string[] {
+  const tools = new Set<string>();
+  for (const command of commands) {
+    if (command.phase !== "partition" && command.phase !== "format") continue;
+    const tool = command.argv[0];
+    if (tool) tools.add(tool);
+  }
+  return [...tools];
+}
+
+/** Pure: plan tool binaries missing from the available set. */
+export function missingPlanTools(
+  commands: PlannedCommand[],
+  available: readonly string[],
+): string[] {
+  return planToolBinaries(commands).filter((tool) => !available.includes(tool));
+}
+
+/**
+ * Checks that the binaries needed by the partition/format phases exist.
+ * A missing mkfs.* tool (e.g. mkfs.ext4 without e2fsprogs in the LiveCD) would
+ * otherwise abort the installation right after the disk has been wiped — this
+ * check must run BEFORE the destructive confirmation.
+ */
+export async function checkPlanTools(commands: PlannedCommand[]): Promise<string[]> {
+  const tools = planToolBinaries(commands);
+  const availability = await Promise.all(tools.map((tool) => hasCommand(tool)));
+  return tools.filter((_, index) => !availability[index]);
 }

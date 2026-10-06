@@ -5,6 +5,7 @@ import {
   buildPartitionLayout,
   keepMountCommands,
   layoutCommands,
+  missingPlanTools,
   parseLsblkPartitions,
   planPartitionCommands,
 } from "../src/system/disks.ts";
@@ -141,6 +142,33 @@ describe("keepMountCommands", () => {
 
   test("без rootPartition — ошибка", () => {
     expect(() => keepMountCommands(disk({ layout: "keep" }))).toThrow();
+  });
+});
+
+describe("missingPlanTools", () => {
+  test("ext4 UEFI план: все инструменты на месте → пусто", () => {
+    const commands = layoutCommands(
+      "/dev/sda",
+      buildPartitionLayout(disk({ filesystem: "ext4" }), "uefi"),
+    );
+    expect(
+      missingPlanTools(commands, ["parted", "udevadm", "mkfs.fat", "mkswap", "mkfs.ext4"]),
+    ).toEqual([]);
+  });
+
+  test("ext4 план без mkfs.ext4 (e2fsprogs отсутствует в LiveCD) → find missing", () => {
+    const commands = layoutCommands(
+      "/dev/sda",
+      buildPartitionLayout(disk({ filesystem: "ext4" }), "uefi"),
+    );
+    expect(missingPlanTools(commands, ["parted", "udevadm", "mkfs.fat", "mkswap"])).toEqual([
+      "mkfs.ext4",
+    ]);
+  });
+
+  test("keep layout (только mount) — проверяемых инструментов нет", () => {
+    const commands = keepMountCommands(disk({ layout: "keep", rootPartition: "/dev/sda2" }));
+    expect(missingPlanTools(commands, [])).toEqual([]);
   });
 });
 
