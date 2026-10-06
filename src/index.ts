@@ -1,3 +1,4 @@
+import { rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { cancel, log } from "@clack/prompts";
@@ -62,6 +63,9 @@ async function checkEnvironment(force: boolean): Promise<void> {
   }
 }
 
+/** Set once phase B starts — used to point at the install log on failure. */
+let phaseBStarted = false;
+
 async function main(): Promise<void> {
   const options = parseArgs(process.argv.slice(2));
 
@@ -91,7 +95,13 @@ async function main(): Promise<void> {
     log.success(`Configuration saved: ${options.config}`);
   }
 
-  // Phase B: applying the configuration (stages 4–7).
+  // Phase B: applying the configuration (stages 4–7). The wizard draft has served
+  // its purpose (crash protection for the input) and is no longer a valid resume
+  // point — without removing it, a failed installation would keep offering to
+  // "restore an unfinished session" on the next launch.
+  phaseBStarted = true;
+  await rm(DRAFT_FILE, { force: true }).catch(() => undefined);
+
   await runInstall(config, {
     interactive: !config.unattended,
     profilesDir: options.profilesDir,
@@ -106,5 +116,11 @@ try {
     process.exit(130);
   }
   log.error(error instanceof Error ? error.message : String(error));
+  if (phaseBStarted) {
+    log.warn(
+      "The detailed install log is written to /var/log/exdbnein/install.log " +
+        "(and into the target system at /mnt/var/log/exdbnein/install.log).",
+    );
+  }
   process.exit(1);
 }
